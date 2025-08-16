@@ -1,0 +1,19 @@
+meta {
+  name: Create user
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{url}}/api/users
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  name: Social media
+}
+
+settings {
+  encodeUrl: true
+}
