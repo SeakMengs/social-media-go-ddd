@@ -29,6 +29,7 @@ func main() {
 	var err error
 
 	var userRepo repository.UserRepository
+	var sessionRepo repository.SessionRepository
 
 	switch cfg.DBDriver {
 	case config.DB_DRIVER_PG:
@@ -43,13 +44,17 @@ func main() {
 		}
 
 		userRepo = postgres.NewPgUserRepository(pool)
+		sessionRepo = postgres.NewPgSessionRepository(pool)
 	case config.DB_DRIVER_MYSQL:
 		// userRepo = repository.NewUserRepositoryMySQL(dbPool)
 	}
 
 	userService := service.NewUserService(userRepo)
+	sessionService := service.NewSessionService(sessionRepo)
 
-	userHandler := http.NewUserHandler(userService)
+	authMiddleware := http.NewAuthMiddleware(sessionService, userService)
+
+	userHandler := http.NewUserHandler(userService, sessionService, authMiddleware)
 
 	app := fiber.New()
 

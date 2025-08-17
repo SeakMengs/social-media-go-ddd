@@ -16,8 +16,8 @@ func NewUserService(repo repository.UserRepository) *UserService {
 	}
 }
 
-func (s *UserService) Create(ctx context.Context, name string) (*entity.User, error) {
-	user, err := entity.NewUser(name)
+func (s *UserService) Create(ctx context.Context, name, password string) (*entity.User, error) {
+	user, err := entity.NewUser(name, password)
 	if err != nil {
 		return nil, err
 	}
@@ -31,6 +31,15 @@ func (s *UserService) Create(ctx context.Context, name string) (*entity.User, er
 
 func (s *UserService) GetByID(ctx context.Context, id string) (*entity.User, error) {
 	user, err := s.repository.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (s *UserService) GetByName(ctx context.Context, name string) (*entity.User, error) {
+	user, err := s.repository.FindByName(ctx, name)
 	if err != nil {
 		return nil, err
 	}

@@ -2,24 +2,27 @@ package entity
 
 import (
 	"errors"
+	"social-media-go-ddd/internal/domain/valueobject"
+	"strings"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type User struct {
 	BaseEntity
-	Name string
+	Name     string               `json:"name"`
+	Password valueobject.Password `json:"-"`
 }
 
-func NewUser(name string) (*User, error) {
+func NewUser(name, password string) (*User, error) {
+	hashPw, err := valueobject.NewPassword(password)
+	if err != nil {
+		return nil, err
+	}
+
 	user := &User{
-		BaseEntity: BaseEntity{
-			ID:        uuid.New(),
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-		},
-		Name: name,
+		BaseEntity: *NewBaseEntity(),
+		Name:       name,
+		Password:   hashPw,
 	}
 
 	if err := user.Validate(); err != nil {
@@ -30,7 +33,7 @@ func NewUser(name string) (*User, error) {
 }
 
 func (s *User) Validate() error {
-	if s.Name == "" {
+	if strings.TrimSpace(s.Name) == "" {
 		return errors.New(ErrNameEmpty)
 	}
 	if s.CreatedAt.After(s.UpdatedAt) {
@@ -38,6 +41,18 @@ func (s *User) Validate() error {
 	}
 
 	return nil
+}
+
+func (s *User) UpdatePassword(password string) error {
+	hashPw, err := valueobject.NewPassword(password)
+	if err != nil {
+		return err
+	}
+
+	s.Password = hashPw
+	s.UpdatedAt = time.Now()
+
+	return s.Validate()
 }
 
 func (s *User) UpdateName(name string) error {

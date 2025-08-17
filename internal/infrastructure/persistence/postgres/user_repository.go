@@ -17,14 +17,14 @@ func NewPgUserRepository(db *pgxpool.Pool) *PgUserRepository {
 }
 
 func (r *PgUserRepository) Save(ctx context.Context, u *entity.User) error {
-	query := `INSERT INTO users (id, name) VALUES ($1, $2)`
+	query := `INSERT INTO users (id, name, password) VALUES ($1, $2, $3)`
 
-	_, err := r.db.Exec(ctx, query, u.ID, u.Name)
+	_, err := r.db.Exec(ctx, query, u.ID, u.Name, u.Password.GetHash())
 	return err
 }
 
 func (r *PgUserRepository) FindByID(ctx context.Context, id string) (*entity.User, error) {
-	query := `SELECT id, name, created_at, updated_at FROM users WHERE id = $1`
+	query := `SELECT id, name, password, created_at, updated_at FROM users WHERE id = $1`
 	rows, err := r.db.Query(ctx, query, id)
 	if err != nil {
 		return nil, err
@@ -36,5 +36,29 @@ func (r *PgUserRepository) FindByID(ctx context.Context, id string) (*entity.Use
 		return nil, err
 	}
 
-	return u.ToEntity(), nil
+	userEntity, err := u.ToEntity()
+	if err != nil {
+		return nil, err
+	}
+	return userEntity, nil
+}
+
+func (r *PgUserRepository) FindByName(ctx context.Context, name string) (*entity.User, error) {
+	query := `SELECT id, name, password, created_at, updated_at FROM users WHERE name = $1`
+	rows, err := r.db.Query(ctx, query, name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	u, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[User])
+	if err != nil {
+		return nil, err
+	}
+
+	userEntity, err := u.ToEntity()
+	if err != nil {
+		return nil, err
+	}
+	return userEntity, nil
 }
