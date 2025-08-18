@@ -1,0 +1,53 @@
+package entity
+
+import (
+	"errors"
+	"social-media-go-ddd/internal/domain/dto"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type Post struct {
+	BaseEntity
+	UserID  uuid.UUID `json:"user_id"`
+	Content string    `json:"content"`
+}
+
+func NewPost(np dto.NewPost) (*Post, error) {
+	post := &Post{
+		BaseEntity: NewBaseEntity(),
+		UserID:     np.UserID,
+		Content:    strings.TrimSpace(np.Content),
+	}
+	if err := post.Validate(); err != nil {
+		return nil, err
+	}
+	return post, nil
+}
+
+func (p *Post) Validate() error {
+	if err := p.BaseEntity.Validate(); err != nil {
+		return err
+	}
+	if p.UserID == uuid.Nil {
+		return errors.New(ErrUserIDEmpty)
+	}
+	if strings.TrimSpace(p.Content) == "" {
+		return errors.New(ErrContentEmpty)
+	}
+	if len(p.Content) > 5000 {
+		return errors.New(ErrContentTooLong)
+	}
+	if p.CreatedAt.After(p.UpdatedAt) {
+		return errors.New(ErrCreatedAtAfterUpdatedAt)
+	}
+	return nil
+}
+
+func (p *Post) UpdateContent(content string) error {
+	p.Content = strings.TrimSpace(content)
+	p.UpdatedAt = time.Now()
+	return p.Validate()
+}

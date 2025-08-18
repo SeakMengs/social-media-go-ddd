@@ -3,6 +3,7 @@ package http
 import (
 	"errors"
 	"social-media-go-ddd/internal/application/service"
+	"social-media-go-ddd/internal/domain/dto"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -55,8 +56,7 @@ func (h *UserHandler) RegisterRoutes(app *fiber.App) {
 
 func (h *UserHandler) CreateUser(ctx *fiber.Ctx) error {
 	type request struct {
-		Name     string `json:"name"`
-		Password string `json:"password"`
+		dto.NewUser
 	}
 
 	var body request
@@ -64,7 +64,7 @@ func (h *UserHandler) CreateUser(ctx *fiber.Ctx) error {
 		return ErrorResponse(ctx, fiber.StatusBadRequest, err)
 	}
 
-	user, err := h.service.user.Create(ctx.Context(), body.Name, body.Password)
+	user, err := h.service.user.Create(ctx.Context(), body.NewUser)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
 	}
@@ -111,7 +111,10 @@ func (h *UserHandler) Login(ctx *fiber.Ctx) error {
 		return ErrorResponse(ctx, fiber.StatusUnauthorized, "invalid credentials")
 	}
 
-	session, err := h.service.session.Create(ctx.Context(), user.ID, time.Now().Add(1*time.Second))
+	session, err := h.service.session.Create(ctx.Context(), dto.NewSession{
+		UserID:   user.ID,
+		ExpireAt: time.Now().Add(1 * time.Second),
+	})
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
 	}

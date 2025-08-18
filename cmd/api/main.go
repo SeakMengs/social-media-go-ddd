@@ -6,10 +6,10 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"social-media-go-ddd/internal/application/config"
 	"social-media-go-ddd/internal/application/http"
 	"social-media-go-ddd/internal/application/service"
 	"social-media-go-ddd/internal/domain/repository"
-	"social-media-go-ddd/internal/infrastructure/config"
 	"social-media-go-ddd/internal/infrastructure/persistence/postgres"
 	"syscall"
 

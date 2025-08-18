@@ -2,11 +2,9 @@ package service
 
 import (
 	"context"
+	"social-media-go-ddd/internal/domain/dto"
 	"social-media-go-ddd/internal/domain/entity"
 	"social-media-go-ddd/internal/domain/repository"
-	"time"
-
-	"github.com/google/uuid"
 )
 
 type SessionService struct {
@@ -19,8 +17,8 @@ func NewSessionService(repo repository.SessionRepository) *SessionService {
 	}
 }
 
-func (s *SessionService) Create(ctx context.Context, userID uuid.UUID, expireAt time.Time) (*entity.Session, error) {
-	session, err := entity.NewSession(userID, expireAt)
+func (s *SessionService) Create(ctx context.Context, ns dto.NewSession) (*entity.Session, error) {
+	session, err := entity.NewSession(ns)
 	if err != nil {
 		return nil, err
 	}

@@ -1,0 +1,55 @@
+Table users {
+  id uuid [primary key]
+  username varchar [not null, unique]
+  email varchar [not null, unique]
+  password_hash varchar [not null]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+}
+
+Table posts {
+  id uuid [primary key]
+  user_id uuid [not null]
+  content text [note: 'Content of the post']
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+}
+
+Table likes {
+  id uuid [primary key]
+  user_id uuid [not null]
+  post_id uuid [not null]
+  created_at timestamp [not null]
+}
+
+Table favorites {
+  id uuid [primary key]
+  user_id uuid [not null]
+  post_id uuid [not null]
+  created_at timestamp [not null]
+}
+
+Table reposts {
+  id uuid [primary key]
+  user_id uuid [not null]
+  post_id uuid [not null]
+  created_at timestamp [not null]
+  comment text [note: 'Optional comment for repost']
+}
+
+Table sessions {
+  id uuid [primary key]
+  user_id uuid [not null]
+  expire_at timestamp [not null]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+}
+
+Ref: posts.user_id > users.id
+Ref: likes.user_id > users.id
+Ref: likes.post_id > posts.id
+Ref: favorites.user_id > users.id
+Ref: favorites.post_id > posts.id
+Ref: reposts.user_id > users.id
+Ref: reposts.post_id > posts.id
+Ref: sessions.user_id > users.id

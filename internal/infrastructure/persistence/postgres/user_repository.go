@@ -17,14 +17,14 @@ func NewPgUserRepository(db *pgxpool.Pool) *PgUserRepository {
 }
 
 func (r *PgUserRepository) Save(ctx context.Context, u *entity.User) error {
-	query := `INSERT INTO users (id, name, password) VALUES ($1, $2, $3)`
+	query := `INSERT INTO users (id, username, email, password) VALUES ($1, $2, $3, $4)`
 
-	_, err := r.db.Exec(ctx, query, u.ID, u.Name, u.Password.GetHash())
+	_, err := r.db.Exec(ctx, query, u.ID, u.Username, u.Email, u.Password.GetHash())
 	return err
 }
 
 func (r *PgUserRepository) FindByID(ctx context.Context, id string) (*entity.User, error) {
-	query := `SELECT id, name, password, created_at, updated_at FROM users WHERE id = $1`
+	query := `SELECT id, username, email, password, created_at, updated_at FROM users WHERE id = $1`
 	rows, err := r.db.Query(ctx, query, id)
 	if err != nil {
 		return nil, err

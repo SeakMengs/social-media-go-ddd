@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"social-media-go-ddd/internal/domain/dto"
 	"social-media-go-ddd/internal/domain/entity"
 	"social-media-go-ddd/internal/domain/repository"
 )
@@ -16,8 +17,8 @@ func NewUserService(repo repository.UserRepository) *UserService {
 	}
 }
 
-func (s *UserService) Create(ctx context.Context, name, password string) (*entity.User, error) {
-	user, err := entity.NewUser(name, password)
+func (s *UserService) Create(ctx context.Context, nu dto.NewUser) (*entity.User, error) {
+	user, err := entity.NewUser(nu)
 	if err != nil {
 		return nil, err
 	}
