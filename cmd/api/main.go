@@ -14,6 +14,8 @@ import (
 	"syscall"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -30,6 +32,7 @@ func main() {
 
 	var userRepo repository.UserRepository
 	var sessionRepo repository.SessionRepository
+	var postRepo repository.PostRepository
 
 	switch cfg.DBDriver {
 	case config.DB_DRIVER_PG:
@@ -45,20 +48,26 @@ func main() {
 
 		userRepo = postgres.NewPgUserRepository(pool)
 		sessionRepo = postgres.NewPgSessionRepository(pool)
+		postRepo = postgres.NewPgPostRepository(pool)
 	case config.DB_DRIVER_MYSQL:
 		// userRepo = repository.NewUserRepositoryMySQL(dbPool)
 	}
 
 	userService := service.NewUserService(userRepo)
 	sessionService := service.NewSessionService(sessionRepo)
+	postService := service.NewPostService(postRepo)
 
 	authMiddleware := http.NewAuthMiddleware(sessionService, userService)
 
-	userHandler := http.NewUserHandler(userService, sessionService, authMiddleware)
+	userHandler := http.NewUserHandler(userService, sessionService, postService, authMiddleware)
+	postHandler := http.NewPostHandler(postService, authMiddleware)
 
 	app := fiber.New()
+	app.Use(recover.New())
+	app.Use(logger.New())
 
 	userHandler.RegisterRoutes(app)
+	postHandler.RegisterRoutes(app)
 
 	// Run server on another goroutine such that we can handle graceful shutdown
 	go func() {

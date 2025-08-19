@@ -20,11 +20,9 @@ func NewPassword(plain string) (Password, error) {
 	if strings.TrimSpace(plain) == "" {
 		return Password{}, fmt.Errorf(ErrPwEmpty)
 	}
-
 	if len(plain) < PwMinLength {
 		return Password{}, fmt.Errorf(ErrPwMinLength, PwMinLength)
 	}
-
 	if len(plain) > PwMaxLength {
 		return Password{}, fmt.Errorf(ErrPwMaxLength, PwMaxLength)
 	}

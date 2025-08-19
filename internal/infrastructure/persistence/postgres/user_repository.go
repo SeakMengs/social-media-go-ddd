@@ -43,9 +43,9 @@ func (r *PgUserRepository) FindByID(ctx context.Context, id string) (*entity.Use
 	return userEntity, nil
 }
 
-func (r *PgUserRepository) FindByName(ctx context.Context, name string) (*entity.User, error) {
-	query := `SELECT id, name, password, created_at, updated_at FROM users WHERE name = $1`
-	rows, err := r.db.Query(ctx, query, name)
+func (r *PgUserRepository) FindByName(ctx context.Context, username string) (*entity.User, error) {
+	query := `SELECT id, username, email, password, created_at, updated_at FROM users WHERE username = $1`
+	rows, err := r.db.Query(ctx, query, username)
 	if err != nil {
 		return nil, err
 	}

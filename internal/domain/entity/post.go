@@ -11,7 +11,7 @@ import (
 
 type Post struct {
 	BaseEntity
-	UserID  uuid.UUID `json:"user_id"`
+	UserID  uuid.UUID `json:"userId"`
 	Content string    `json:"content"`
 }
 

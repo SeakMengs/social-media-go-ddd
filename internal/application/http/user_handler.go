@@ -12,12 +12,14 @@ import (
 type UserHandlerService struct {
 	user    *service.UserService
 	session *service.SessionService
+	post    *service.PostService
 }
 
-func NewUserHandlerService(user *service.UserService, session *service.SessionService) *UserHandlerService {
+func NewUserHandlerService(user *service.UserService, session *service.SessionService, post *service.PostService) *UserHandlerService {
 	return &UserHandlerService{
 		user:    user,
 		session: session,
+		post:    post,
 	}
 }
 
@@ -36,18 +38,23 @@ type UserHandler struct {
 	middleware *UserHandlerMiddleware
 }
 
-func NewUserHandler(userService *service.UserService, sessionService *service.SessionService, authMiddleware *AuthMiddleware) *UserHandler {
+func NewUserHandler(userService *service.UserService, sessionService *service.SessionService, postService *service.PostService, authMiddleware *AuthMiddleware) *UserHandler {
 	return &UserHandler{
-		service:    NewUserHandlerService(userService, sessionService),
+		service:    NewUserHandlerService(userService, sessionService, postService),
 		middleware: NewUserHandlerMiddleware(authMiddleware),
 	}
 }
 
 func (h *UserHandler) RegisterRoutes(app *fiber.App) {
-	apiUsers := app.Group("/api/v1/users", h.middleware.auth.Handler)
-	apiUsers.Get("/me", h.Me)
-	apiUsers.Get("/:id", h.GetUserByID)
+	apiUsersProtected := app.Group("/api/v1/users", h.middleware.auth.Handler)
+	apiUsersProtected.Get("/me", h.Me)
+	apiUsersProtected.Get("/me/posts", h.GetMyPosts)
 
+	apiUsers := app.Group("/api/v1/users")
+	apiUsers.Get("/:id", h.GetUserByID)
+	apiUsers.Get("/:id/posts", h.GetUserPosts)
+
+	// No middleware route
 	apiAuth := app.Group("/api/v1/auth")
 	apiAuth.Post("/register", h.CreateUser)
 	apiAuth.Post("/login", h.Login)
@@ -69,7 +76,9 @@ func (h *UserHandler) CreateUser(ctx *fiber.Ctx) error {
 		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
 	}
 
-	return SuccessResponse(ctx, user)
+	return SuccessResponse(ctx, fiber.Map{
+		"user": user,
+	})
 }
 
 func (h *UserHandler) GetUserByID(ctx *fiber.Ctx) error {
@@ -79,7 +88,9 @@ func (h *UserHandler) GetUserByID(ctx *fiber.Ctx) error {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
 
-	return SuccessResponse(ctx, user)
+	return SuccessResponse(ctx, fiber.Map{
+		"user": user,
+	})
 }
 
 func (h *UserHandler) Me(ctx *fiber.Ctx) error {
@@ -88,13 +99,14 @@ func (h *UserHandler) Me(ctx *fiber.Ctx) error {
 		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
 	}
 
-	return SuccessResponse(ctx, user)
+	return SuccessResponse(ctx, fiber.Map{
+		"user": user,
+	})
 }
 
 func (h *UserHandler) Login(ctx *fiber.Ctx) error {
 	type request struct {
-		Name     string `json:"name"`
-		Password string `json:"password"`
+		dto.UserLogin
 	}
 
 	var body request
@@ -102,7 +114,7 @@ func (h *UserHandler) Login(ctx *fiber.Ctx) error {
 		return ErrorResponse(ctx, fiber.StatusBadRequest, err)
 	}
 
-	user, err := h.service.user.GetByName(ctx.Context(), body.Name)
+	user, err := h.service.user.GetByName(ctx.Context(), body.Username)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
@@ -113,7 +125,7 @@ func (h *UserHandler) Login(ctx *fiber.Ctx) error {
 
 	session, err := h.service.session.Create(ctx.Context(), dto.NewSession{
 		UserID:   user.ID,
-		ExpireAt: time.Now().Add(1 * time.Second),
+		ExpireAt: time.Now().Add(24 * time.Hour),
 	})
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
@@ -144,4 +156,32 @@ func (h *UserHandler) Logout(ctx *fiber.Ctx) error {
 	}
 
 	return SuccessResponse(ctx, nil)
+}
+
+func (h *UserHandler) GetMyPosts(ctx *fiber.Ctx) error {
+	user, err := GetUserFromCtx(ctx)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
+	}
+
+	posts, err := h.service.post.GetByUserID(ctx.Context(), user.ID.String())
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	}
+
+	return SuccessResponse(ctx, fiber.Map{
+		"posts": posts,
+	})
+}
+
+func (h *UserHandler) GetUserPosts(ctx *fiber.Ctx) error {
+	id := ctx.Params("id")
+	posts, err := h.service.post.GetByUserID(ctx.Context(), id)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	}
+
+	return SuccessResponse(ctx, fiber.Map{
+		"posts": posts,
+	})
 }

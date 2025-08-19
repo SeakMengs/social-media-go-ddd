@@ -9,8 +9,8 @@ import (
 
 type Favorite struct {
 	BaseEntity
-	UserID uuid.UUID `json:"user_id"`
-	PostID uuid.UUID `json:"post_id"`
+	UserID uuid.UUID `json:"userId"`
+	PostID uuid.UUID `json:"postId"`
 }
 
 func NewFavorite(nf dto.NewFavorite) (*Favorite, error) {
