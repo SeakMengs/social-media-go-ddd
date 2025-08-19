@@ -31,12 +31,7 @@ func (s *PostService) Create(ctx context.Context, np dto.NewPost) (*entity.Post,
 }
 
 func (s *PostService) GetByID(ctx context.Context, id string) (*aggregate.Post, error) {
-	post, err := s.repository.FindByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	return post, nil
+	return s.repository.FindByID(ctx, id)
 }
 
 func (s *PostService) GetByUserID(ctx context.Context, userID string) ([]*aggregate.Post, error) {
@@ -49,15 +44,17 @@ func (s *PostService) GetByUserID(ctx context.Context, userID string) ([]*aggreg
 }
 
 func (s *PostService) Delete(ctx context.Context, dp dto.DeletePost) error {
-	if err := s.repository.Delete(ctx, dp.ID, dp.UserID.String()); err != nil {
-		return err
-	}
-	return nil
+	return s.repository.Delete(ctx, dp.ID, dp.UserID.String())
 }
 
-func (s *PostService) Update(ctx context.Context, up dto.UpdatePost) error {
-	if err := s.repository.Update(ctx, up.ID, up.UserID.String(), up.Content); err != nil {
-		return err
+func (s *PostService) Update(ctx context.Context, old *entity.Post, up dto.UpdatePost) (*entity.Post, error) {
+	post, err := entity.NewPostForUpdate(old, up)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	err = s.repository.Update(ctx, post)
+	if err != nil {
+		return nil, err
+	}
+	return post, nil
 }

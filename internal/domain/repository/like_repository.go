@@ -7,7 +7,6 @@ import (
 
 type LikeRepository interface {
 	Save(ctx context.Context, l *entity.Like) error
+	// Should delete all like in db by user id and post id because one person should be able to like only one post
 	Delete(ctx context.Context, userID, postID string) error
-	CountByPost(ctx context.Context, postID string) (int, error)
-	FindByUserAndPost(ctx context.Context, userID, postID string) (*entity.Like, error)
 }

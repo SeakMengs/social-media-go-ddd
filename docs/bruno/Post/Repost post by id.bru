@@ -1,17 +1,17 @@
 meta {
-  name: Create post
+  name: Repost post by id
   type: http
-  seq: 1
+  seq: 7
 }
 
 post {
-  url: {{url}}/api/v1/posts
+  url: {{url}}/api/v1/posts/44136d85-065f-4151-9fc7-f7a143de5448/repost
   body: multipartForm
   auth: inherit
 }
 
 body:multipart-form {
-  content: I like car 🚘️
+  comment: nice
 }
 
 settings {

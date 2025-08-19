@@ -22,7 +22,6 @@ func (s *SessionService) Create(ctx context.Context, ns dto.NewSession) (*entity
 	if err != nil {
 		return nil, err
 	}
-
 	if err = s.repository.Save(ctx, session); err != nil {
 		return nil, err
 	}
@@ -31,18 +30,9 @@ func (s *SessionService) Create(ctx context.Context, ns dto.NewSession) (*entity
 }
 
 func (s *SessionService) GetByID(ctx context.Context, id string) (*entity.Session, error) {
-	session, err := s.repository.FindByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	return session, nil
+	return s.repository.FindByID(ctx, id)
 }
 
-func (s *SessionService) Delete(ctx context.Context, id string) error {
-	if err := s.repository.Delete(ctx, id); err != nil {
-		return err
-	}
-
-	return nil
+func (s *SessionService) Delete(ctx context.Context, ds dto.DeleteSession) error {
+	return s.repository.Delete(ctx, ds.ID)
 }

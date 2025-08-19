@@ -106,8 +106,8 @@ func (r *PgPostRepository) Delete(ctx context.Context, id string, userId string)
 	return err
 }
 
-func (r *PgPostRepository) Update(ctx context.Context, id string, userId string, content string) error {
-	query := `UPDATE posts SET content = $1 WHERE id = $2 AND user_id = $3`
-	_, err := r.pool.Exec(ctx, query, content, id, userId)
+func (r *PgPostRepository) Update(ctx context.Context, p *entity.Post) error {
+	query := `UPDATE posts SET content = $1, updated_at = $2 WHERE id = $3 AND user_id = $4`
+	_, err := r.pool.Exec(ctx, query, p.Content, p.UpdatedAt, p.ID, p.UserID)
 	return err
 }

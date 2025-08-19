@@ -151,7 +151,9 @@ func (h *UserHandler) Logout(ctx *fiber.Ctx) error {
 		return ErrorResponse(ctx, fiber.StatusUnauthorized, errors.New("invalid session"))
 	}
 
-	if err := h.service.session.Delete(ctx.Context(), session.ID.String()); err != nil {
+	if err := h.service.session.Delete(ctx.Context(), dto.DeleteSession{
+		ID: session.ID.String(),
+	}); err != nil {
 		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
 	}
 

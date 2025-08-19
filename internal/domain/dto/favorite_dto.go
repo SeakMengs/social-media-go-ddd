@@ -7,4 +7,9 @@ type (
 		UserID uuid.UUID `json:"user_id"`
 		PostID uuid.UUID `json:"post_id"`
 	}
+
+	DeleteFavorite struct {
+		UserID uuid.UUID `json:"user_id"`
+		PostID uuid.UUID `json:"post_id"`
+	}
 )

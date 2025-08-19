@@ -10,4 +10,8 @@ type (
 		PostID  uuid.UUID `json:"post_id"`
 		Comment string    `json:"comment"`
 	}
+
+	DeleteRepost struct {
+		ID string `json:"id"`
+	}
 )

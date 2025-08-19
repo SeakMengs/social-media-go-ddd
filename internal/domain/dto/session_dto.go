@@ -11,4 +11,8 @@ type (
 		UserID   uuid.UUID `json:"user_id"`
 		ExpireAt time.Time `json:"expire_at"`
 	}
+
+	DeleteSession struct {
+		ID string `json:"id"`
+	}
 )

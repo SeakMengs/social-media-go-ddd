@@ -27,6 +27,19 @@ func NewPost(np dto.NewPost) (*Post, error) {
 	return post, nil
 }
 
+func NewPostForUpdate(oldPost *Post, up dto.UpdatePost) (*Post, error) {
+	post := &Post{
+		BaseEntity: oldPost.BaseEntity,
+		UserID:     oldPost.UserID,
+		Content:    strings.TrimSpace(up.Content),
+	}
+	if err := post.Validate(); err != nil {
+		return nil, err
+	}
+	post.UpdatedAt = time.Now()
+	return post, nil
+}
+
 func (p *Post) Validate() error {
 	if err := p.BaseEntity.Validate(); err != nil {
 		return err

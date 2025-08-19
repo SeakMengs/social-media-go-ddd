@@ -8,12 +8,18 @@ import (
 )
 
 type PostHandlerService struct {
-	post *service.PostService
+	post     *service.PostService
+	like     *service.LikeService
+	repost   *service.RepostService
+	favorite *service.FavoriteService
 }
 
-func NewPostHandlerService(post *service.PostService) *PostHandlerService {
+func NewPostHandlerService(post *service.PostService, like *service.LikeService, repost *service.RepostService, favorite *service.FavoriteService) *PostHandlerService {
 	return &PostHandlerService{
-		post: post,
+		post:     post,
+		like:     like,
+		repost:   repost,
+		favorite: favorite,
 	}
 }
 
@@ -32,9 +38,9 @@ type PostHandler struct {
 	middleware *PostHandlerMiddleware
 }
 
-func NewPostHandler(postService *service.PostService, authMiddleware *AuthMiddleware) *PostHandler {
+func NewPostHandler(postService *service.PostService, likeService *service.LikeService, repostService *service.RepostService, favoriteService *service.FavoriteService, authMiddleware *AuthMiddleware) *PostHandler {
 	return &PostHandler{
-		service:    NewPostHandlerService(postService),
+		service:    NewPostHandlerService(postService, likeService, repostService, favoriteService),
 		middleware: NewPostHandlerMiddleware(authMiddleware),
 	}
 }
@@ -47,6 +53,14 @@ func (h *PostHandler) RegisterRoutes(app *fiber.App) {
 	apiPostsProtected.Post("/", h.CreatePost)
 	apiPostsProtected.Put("/:id", h.UpdatePost)
 	apiPostsProtected.Delete("/:id", h.DeletePost)
+	apiPostsProtected.Post("/:id/like", h.LikePost)
+	apiPostsProtected.Delete("/:id/like", h.UnlikePost)
+	apiPostsProtected.Post("/:id/favorite", h.FavoritePost)
+	apiPostsProtected.Delete("/:id/favorite", h.UnfavoritePost)
+	apiPostsProtected.Post("/:id/repost", h.RepostPost)
+
+	apiRepostsProtected := app.Group("/api/v1/reposts", h.middleware.auth.Handler)
+	apiRepostsProtected.Delete("/:id", h.UnrepostPost)
 }
 
 func (h *PostHandler) CreatePost(ctx *fiber.Ctx) error {
@@ -118,11 +132,14 @@ func (h *PostHandler) UpdatePost(ctx *fiber.Ctx) error {
 		return ErrorResponse(ctx, fiber.StatusForbidden, "you are not allowed to update this post")
 	}
 
-	if err := h.service.post.Update(ctx.Context(), body); err != nil {
+	updatedPost, err := h.service.post.Update(ctx.Context(), &post.Post, body)
+	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
 	}
 
-	return SuccessResponse(ctx, nil)
+	return SuccessResponse(ctx, fiber.Map{
+		"post": updatedPost,
+	})
 }
 
 func (h *PostHandler) GetPostByID(ctx *fiber.Ctx) error {
@@ -135,4 +152,151 @@ func (h *PostHandler) GetPostByID(ctx *fiber.Ctx) error {
 	return SuccessResponse(ctx, fiber.Map{
 		"post": post,
 	})
+}
+
+func (h *PostHandler) LikePost(ctx *fiber.Ctx) error {
+	user, err := GetUserFromCtx(ctx)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
+	}
+
+	id := ctx.Params("id")
+	post, err := h.service.post.GetByID(ctx.Context(), id)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusNotFound, err)
+	}
+
+	_, err = h.service.like.Create(ctx.Context(), dto.NewLike{
+		UserID: user.ID,
+		PostID: post.ID,
+	})
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	}
+
+	return SuccessResponse(ctx, nil)
+}
+
+func (h *PostHandler) UnlikePost(ctx *fiber.Ctx) error {
+	user, err := GetUserFromCtx(ctx)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
+	}
+
+	id := ctx.Params("id")
+	post, err := h.service.post.GetByID(ctx.Context(), id)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusNotFound, err)
+	}
+
+	err = h.service.like.Delete(ctx.Context(), dto.DeleteLike{
+		UserID: user.ID,
+		PostID: post.ID,
+	})
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	}
+
+	return SuccessResponse(ctx, nil)
+}
+
+func (h *PostHandler) FavoritePost(ctx *fiber.Ctx) error {
+	user, err := GetUserFromCtx(ctx)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
+	}
+
+	id := ctx.Params("id")
+	post, err := h.service.post.GetByID(ctx.Context(), id)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusNotFound, err)
+	}
+
+	_, err = h.service.favorite.Create(ctx.Context(), dto.NewFavorite{
+		UserID: user.ID,
+		PostID: post.ID,
+	})
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	}
+
+	return SuccessResponse(ctx, nil)
+}
+
+func (h *PostHandler) UnfavoritePost(ctx *fiber.Ctx) error {
+	user, err := GetUserFromCtx(ctx)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
+	}
+
+	id := ctx.Params("id")
+	post, err := h.service.post.GetByID(ctx.Context(), id)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusNotFound, err)
+	}
+
+	err = h.service.favorite.Delete(ctx.Context(), dto.DeleteFavorite{
+		UserID: user.ID,
+		PostID: post.ID,
+	})
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	}
+
+	return SuccessResponse(ctx, nil)
+}
+
+func (h *PostHandler) RepostPost(ctx *fiber.Ctx) error {
+	type request struct {
+		dto.NewRepost
+	}
+
+	user, err := GetUserFromCtx(ctx)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
+	}
+
+	id := ctx.Params("id")
+	var body request
+	if err := ctx.BodyParser(&body); err != nil {
+		return ErrorResponse(ctx, fiber.StatusBadRequest, err)
+	}
+
+	post, err := h.service.post.GetByID(ctx.Context(), id)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusNotFound, err)
+	}
+	body.UserID = user.ID
+	body.PostID = post.ID
+
+	repost, err := h.service.repost.Create(ctx.Context(), body.NewRepost)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	}
+
+	return SuccessResponse(ctx, fiber.Map{
+		"repost": repost,
+	})
+}
+
+func (h *PostHandler) UnrepostPost(ctx *fiber.Ctx) error {
+	_, err := GetUserFromCtx(ctx)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
+	}
+
+	id := ctx.Params("id")
+	repost, err := h.service.repost.GetByID(ctx.Context(), id)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusNotFound, err)
+	}
+
+	err = h.service.repost.Delete(ctx.Context(), dto.DeleteRepost{
+		ID: repost.ID.String(),
+	})
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	}
+
+	return SuccessResponse(ctx, nil)
 }

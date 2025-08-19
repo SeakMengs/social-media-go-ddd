@@ -31,19 +31,9 @@ func (s *UserService) Create(ctx context.Context, nu dto.NewUser) (*entity.User,
 }
 
 func (s *UserService) GetByID(ctx context.Context, id string) (*entity.User, error) {
-	user, err := s.repository.FindByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
+	return s.repository.FindByID(ctx, id)
 }
 
 func (s *UserService) GetByName(ctx context.Context, name string) (*entity.User, error) {
-	user, err := s.repository.FindByName(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
+	return s.repository.FindByName(ctx, name)
 }

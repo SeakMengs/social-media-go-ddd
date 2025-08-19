@@ -11,7 +11,7 @@ type PostRepository interface {
 	FindByID(ctx context.Context, id string) (*aggregate.Post, error)
 	FindByUserID(ctx context.Context, userID string) ([]*aggregate.Post, error)
 	Delete(ctx context.Context, id string, userId string) error
-	Update(ctx context.Context, id string, userId string, content string) error
+	Update(ctx context.Context, p *entity.Post) error
 
 	// FindFeedByUserID(ctx context.Context, userID string, limit, offset int) ([]*aggregate.Post, error)
 }

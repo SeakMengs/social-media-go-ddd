@@ -33,6 +33,9 @@ func main() {
 	var userRepo repository.UserRepository
 	var sessionRepo repository.SessionRepository
 	var postRepo repository.PostRepository
+	var favoriteRepo repository.FavoriteRepository
+	var likeRepo repository.LikeRepository
+	var repostRepo repository.RepostRepository
 
 	switch cfg.DBDriver {
 	case config.DB_DRIVER_PG:
@@ -49,6 +52,9 @@ func main() {
 		userRepo = postgres.NewPgUserRepository(pool)
 		sessionRepo = postgres.NewPgSessionRepository(pool)
 		postRepo = postgres.NewPgPostRepository(pool)
+		favoriteRepo = postgres.NewPgFavoriteRepository(pool)
+		likeRepo = postgres.NewPgLikeRepository(pool)
+		repostRepo = postgres.NewPgRepostRepository(pool)
 	case config.DB_DRIVER_MYSQL:
 		// userRepo = repository.NewUserRepositoryMySQL(dbPool)
 	}
@@ -56,11 +62,14 @@ func main() {
 	userService := service.NewUserService(userRepo)
 	sessionService := service.NewSessionService(sessionRepo)
 	postService := service.NewPostService(postRepo)
+	favoriteService := service.NewFavoriteService(favoriteRepo)
+	likeService := service.NewLikeService(likeRepo)
+	repostService := service.NewRepostService(repostRepo)
 
 	authMiddleware := http.NewAuthMiddleware(sessionService, userService)
 
 	userHandler := http.NewUserHandler(userService, sessionService, postService, authMiddleware)
-	postHandler := http.NewPostHandler(postService, authMiddleware)
+	postHandler := http.NewPostHandler(postService, likeService, repostService, favoriteService, authMiddleware)
 
 	app := fiber.New()
 	app.Use(recover.New())

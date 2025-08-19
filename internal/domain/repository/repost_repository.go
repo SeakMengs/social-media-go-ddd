@@ -7,6 +7,7 @@ import (
 
 type RepostRepository interface {
 	Save(ctx context.Context, r *entity.Repost) error
+	// Because a user can do many reposts, delete by id is enough
 	Delete(ctx context.Context, id string) error
-	FindByUser(ctx context.Context, userID string) ([]*entity.Repost, error)
+	FindByID(ctx context.Context, id string) (*entity.Repost, error)
 }
