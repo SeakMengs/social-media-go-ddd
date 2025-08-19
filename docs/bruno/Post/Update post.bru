@@ -1,0 +1,19 @@
+meta {
+  name: Update post
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{url}}/api/v1/posts/5c3eda68-ba46-4314-80fd-478e207b5234
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  content: I like car 🚘️
+}
+
+settings {
+  encodeUrl: true
+}

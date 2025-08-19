@@ -48,8 +48,15 @@ func (s *PostService) GetByUserID(ctx context.Context, userID string) ([]*aggreg
 	return posts, nil
 }
 
-func (s *PostService) Delete(ctx context.Context, id string) error {
-	if err := s.repository.Delete(ctx, id); err != nil {
+func (s *PostService) Delete(ctx context.Context, dp dto.DeletePost) error {
+	if err := s.repository.Delete(ctx, dp.ID, dp.UserID.String()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *PostService) Update(ctx context.Context, up dto.UpdatePost) error {
+	if err := s.repository.Update(ctx, up.ID, up.UserID.String(), up.Content); err != nil {
 		return err
 	}
 	return nil

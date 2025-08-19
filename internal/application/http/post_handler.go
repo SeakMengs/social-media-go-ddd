@@ -45,7 +45,8 @@ func (h *PostHandler) RegisterRoutes(app *fiber.App) {
 
 	apiPostsProtected := app.Group("/api/v1/posts", h.middleware.auth.Handler)
 	apiPostsProtected.Post("/", h.CreatePost)
-
+	apiPostsProtected.Put("/:id", h.UpdatePost)
+	apiPostsProtected.Delete("/:id", h.DeletePost)
 }
 
 func (h *PostHandler) CreatePost(ctx *fiber.Ctx) error {
@@ -59,10 +60,10 @@ func (h *PostHandler) CreatePost(ctx *fiber.Ctx) error {
 	}
 
 	var body request
-	body.NewPost.UserID = user.ID
 	if err := ctx.BodyParser(&body); err != nil {
 		return ErrorResponse(ctx, fiber.StatusBadRequest, err)
 	}
+	body.NewPost.UserID = user.ID
 
 	post, err := h.service.post.Create(ctx.Context(), body.NewPost)
 	if err != nil {
@@ -72,6 +73,56 @@ func (h *PostHandler) CreatePost(ctx *fiber.Ctx) error {
 	return SuccessResponse(ctx, fiber.Map{
 		"post": post,
 	})
+}
+
+func (h *PostHandler) DeletePost(ctx *fiber.Ctx) error {
+	user, err := GetUserFromCtx(ctx)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
+	}
+	id := ctx.Params("id")
+
+	post, err := h.service.post.GetByID(ctx.Context(), id)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusNotFound, err)
+	}
+	if post.UserID != user.ID {
+		return ErrorResponse(ctx, fiber.StatusForbidden, "you are not allowed to update this post")
+	}
+
+	if err := h.service.post.Delete(ctx.Context(), dto.DeletePost{ID: id, UserID: user.ID}); err != nil {
+		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	}
+	return SuccessResponse(ctx, nil)
+}
+
+func (h *PostHandler) UpdatePost(ctx *fiber.Ctx) error {
+	user, err := GetUserFromCtx(ctx)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
+	}
+
+	id := ctx.Params("id")
+	var body dto.UpdatePost
+	if err := ctx.BodyParser(&body); err != nil {
+		return ErrorResponse(ctx, fiber.StatusBadRequest, err)
+	}
+	body.UserID = user.ID
+	body.ID = id
+
+	post, err := h.service.post.GetByID(ctx.Context(), id)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusNotFound, err)
+	}
+	if post.UserID != user.ID {
+		return ErrorResponse(ctx, fiber.StatusForbidden, "you are not allowed to update this post")
+	}
+
+	if err := h.service.post.Update(ctx.Context(), body); err != nil {
+		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	}
+
+	return SuccessResponse(ctx, nil)
 }
 
 func (h *PostHandler) GetPostByID(ctx *fiber.Ctx) error {

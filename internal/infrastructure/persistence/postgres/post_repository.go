@@ -9,17 +9,17 @@ import (
 )
 
 type PgPostRepository struct {
-	db *pgxpool.Pool
+	basePgRepository
 }
 
-func NewPgPostRepository(db *pgxpool.Pool) *PgPostRepository {
-	return &PgPostRepository{db: db}
+func NewPgPostRepository(pool *pgxpool.Pool) *PgPostRepository {
+	return &PgPostRepository{basePgRepository: NewBasePgRepository(pool)}
 }
 
 func (r *PgPostRepository) Save(ctx context.Context, p *entity.Post) error {
 	query := `INSERT INTO posts (id, user_id, content) VALUES ($1, $2, $3)`
 
-	_, err := r.db.Exec(ctx, query, p.ID, p.UserID, p.Content)
+	_, err := r.pool.Exec(ctx, query, p.ID, p.UserID, p.Content)
 	return err
 }
 
@@ -39,7 +39,7 @@ func (r *PgPostRepository) FindByID(ctx context.Context, id string) (*aggregate.
 		) reposts_count ON reposts_count.post_id = posts.id
 		WHERE posts.id = $1`
 	var post aggregate.Post
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&post.ID,
 		&post.UserID,
 		&post.Content,
@@ -71,7 +71,7 @@ func (r *PgPostRepository) FindByUserID(ctx context.Context, userID string) ([]*
 		SELECT post_id, COUNT(*) AS count FROM reposts GROUP BY post_id
 		) reposts_count ON reposts_count.post_id = posts.id
 		WHERE posts.user_id = $1`
-	rows, err := r.db.Query(ctx, query, userID)
+	rows, err := r.pool.Query(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -100,8 +100,14 @@ func (r *PgPostRepository) FindByUserID(ctx context.Context, userID string) ([]*
 	return posts, nil
 }
 
-func (r *PgPostRepository) Delete(ctx context.Context, id string) error {
-	query := `DELETE FROM posts WHERE id = $1`
-	_, err := r.db.Exec(ctx, query, id)
+func (r *PgPostRepository) Delete(ctx context.Context, id string, userId string) error {
+	query := `DELETE FROM posts WHERE id = $1 AND user_id = $2`
+	_, err := r.pool.Exec(ctx, query, id, userId)
+	return err
+}
+
+func (r *PgPostRepository) Update(ctx context.Context, id string, userId string, content string) error {
+	query := `UPDATE posts SET content = $1 WHERE id = $2 AND user_id = $3`
+	_, err := r.pool.Exec(ctx, query, content, id, userId)
 	return err
 }
