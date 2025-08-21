@@ -61,7 +61,8 @@ func (c *Config) BuildDSN() string {
 		return fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
 			c.DBUser, c.DBPassword, c.DBHost, c.DBPort, c.DBName)
 	case DB_DRIVER_MYSQL:
-		return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s",
+		// add parseTime to fix unsupported Scan, storing driver.Value type []uint8 into type *time.Time
+		return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true",
 			c.DBUser, c.DBPassword, c.DBHost, c.DBPort, c.DBName)
 	default:
 		log.Fatalf("Unsupported DB driver: %s", c.DBDriver)

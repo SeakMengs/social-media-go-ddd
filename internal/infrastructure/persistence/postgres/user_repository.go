@@ -38,11 +38,7 @@ func (r *PgUserRepository) FindByID(ctx context.Context, id string) (*entity.Use
 		return nil, err
 	}
 
-	userEntity, err := u.ToEntity()
-	if err != nil {
-		return nil, err
-	}
-	return userEntity, nil
+	return u.ToEntity()
 }
 
 func (r *PgUserRepository) FindByName(ctx context.Context, username string) (*entity.User, error) {
@@ -58,9 +54,5 @@ func (r *PgUserRepository) FindByName(ctx context.Context, username string) (*en
 		return nil, err
 	}
 
-	userEntity, err := u.ToEntity()
-	if err != nil {
-		return nil, err
-	}
-	return userEntity, nil
+	return u.ToEntity()
 }

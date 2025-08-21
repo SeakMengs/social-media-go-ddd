@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"social-media-go-ddd/internal/application/http"
 	"social-media-go-ddd/internal/application/service"
 	"social-media-go-ddd/internal/domain/repository"
+	"social-media-go-ddd/internal/infrastructure/persistence/mysql"
 	"social-media-go-ddd/internal/infrastructure/persistence/postgres"
 	"syscall"
 
@@ -28,6 +30,8 @@ func main() {
 	}
 
 	var pool *pgxpool.Pool
+	var mysqlDB *sql.DB
+
 	var err error
 
 	var userRepo repository.UserRepository
@@ -44,10 +48,7 @@ func main() {
 			log.Fatalf("Failed to create Postgres pool: %v", err)
 		}
 		defer pool.Close()
-
-		if err = pool.Ping(ctx); err != nil {
-			log.Fatalf("Failed to ping Postgres: %v", err)
-		}
+		log.Println("Postgres connection pool established")
 
 		userRepo = postgres.NewPgUserRepository(pool)
 		sessionRepo = postgres.NewPgSessionRepository(pool)
@@ -56,7 +57,19 @@ func main() {
 		likeRepo = postgres.NewPgLikeRepository(pool)
 		repostRepo = postgres.NewPgRepostRepository(pool)
 	case config.DB_DRIVER_MYSQL:
-		// userRepo = repository.NewUserRepositoryMySQL(dbPool)
+		mysqlDB, err = mysql.NewMySQLDB(cfg.BuildDSN())
+		if err != nil {
+			log.Fatalf("Failed to connect to MySQL: %v", err)
+		}
+		defer mysqlDB.Close()
+		log.Println("MySQL connection established")
+
+		userRepo = mysql.NewMySQLUserRepository(mysqlDB)
+		sessionRepo = mysql.NewMySQLSessionRepository(mysqlDB)
+		postRepo = mysql.NewMySQLPostRepository(mysqlDB)
+		favoriteRepo = mysql.NewMySQLFavoriteRepository(mysqlDB)
+		likeRepo = mysql.NewMySQLLikeRepository(mysqlDB)
+		repostRepo = mysql.NewMySQLRepostRepository(mysqlDB)
 	}
 
 	userService := service.NewUserService(userRepo)
@@ -102,6 +115,15 @@ func main() {
 		log.Println("Closing postgres connection pool...")
 		pool.Close()
 	}
+
+	if mysqlDB != nil {
+		log.Println("Closing MySQL connection...")
+		if err := mysqlDB.Close(); err != nil {
+			log.Printf("Error closing MySQL connection: %v", err)
+		}
+	}
+
+	log.Println("Cleanup completed. Exiting application.")
 
 	log.Println("Server gracefully stopped.")
 }

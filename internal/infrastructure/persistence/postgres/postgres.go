@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -18,6 +19,10 @@ func NewPgPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Postgres: %w", err)
+	}
+
+	if err = pool.Ping(ctx); err != nil {
+		log.Fatalf("Failed to ping Postgres: %v", err)
 	}
 
 	return pool, nil

@@ -3,6 +3,7 @@ package http
 import (
 	"errors"
 	"social-media-go-ddd/internal/application/service"
+	"social-media-go-ddd/internal/domain/aggregate"
 	"social-media-go-ddd/internal/domain/dto"
 	"time"
 
@@ -171,6 +172,10 @@ func (h *UserHandler) GetMyPosts(ctx *fiber.Ctx) error {
 		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
 	}
 
+	if posts == nil {
+		posts = []*aggregate.Post{}
+	}
+
 	return SuccessResponse(ctx, fiber.Map{
 		"posts": posts,
 	})
@@ -181,6 +186,10 @@ func (h *UserHandler) GetUserPosts(ctx *fiber.Ctx) error {
 	posts, err := h.service.post.GetByUserID(ctx.Context(), id)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	}
+
+	if posts == nil {
+		posts = []*aggregate.Post{}
 	}
 
 	return SuccessResponse(ctx, fiber.Map{

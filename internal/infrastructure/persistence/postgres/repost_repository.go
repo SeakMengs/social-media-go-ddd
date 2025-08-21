@@ -26,16 +26,12 @@ func (r *PgRepostRepository) FindByID(ctx context.Context, id string) (*entity.R
 	}
 	defer rows.Close()
 
-	u, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[Repost])
+	rp, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[Repost])
 	if err != nil {
 		return nil, err
 	}
 
-	repostEntity, err := u.ToEntity()
-	if err != nil {
-		return nil, err
-	}
-	return repostEntity, nil
+	return rp.ToEntity()
 }
 
 func (r *PgRepostRepository) Save(ctx context.Context, rp *entity.Repost) error {

@@ -36,11 +36,7 @@ func (r *PgSessionRepository) FindByID(ctx context.Context, id string) (*entity.
 		return nil, err
 	}
 
-	session, err := s.ToEntity()
-	if err != nil {
-		return nil, err
-	}
-	return session, nil
+	return s.ToEntity()
 }
 
 func (r *PgSessionRepository) Delete(ctx context.Context, id string) error {
