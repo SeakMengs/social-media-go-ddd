@@ -5,7 +5,6 @@ import (
 	"social-media-go-ddd/internal/application/service"
 	"social-media-go-ddd/internal/domain/aggregate"
 	"social-media-go-ddd/internal/domain/dto"
-	"social-media-go-ddd/internal/domain/entity"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -15,16 +14,14 @@ type UserHandlerService struct {
 	user    *service.UserService
 	session *service.SessionService
 	post    *service.PostService
-	repost  *service.RepostService
 	follow  *service.FollowService
 }
 
-func NewUserHandlerService(user *service.UserService, session *service.SessionService, post *service.PostService, repost *service.RepostService, follow *service.FollowService) *UserHandlerService {
+func NewUserHandlerService(user *service.UserService, session *service.SessionService, post *service.PostService, follow *service.FollowService) *UserHandlerService {
 	return &UserHandlerService{
 		user:    user,
 		session: session,
 		post:    post,
-		repost:  repost,
 		follow:  follow,
 	}
 }
@@ -44,9 +41,9 @@ type UserHandler struct {
 	middleware *UserHandlerMiddleware
 }
 
-func NewUserHandler(userService *service.UserService, sessionService *service.SessionService, postService *service.PostService, repostService *service.RepostService, followService *service.FollowService, authMiddleware *AuthMiddleware) *UserHandler {
+func NewUserHandler(userService *service.UserService, sessionService *service.SessionService, postService *service.PostService, followService *service.FollowService, authMiddleware *AuthMiddleware) *UserHandler {
 	return &UserHandler{
-		service:    NewUserHandlerService(userService, sessionService, postService, repostService, followService),
+		service:    NewUserHandlerService(userService, sessionService, postService, followService),
 		middleware: NewUserHandlerMiddleware(authMiddleware),
 	}
 }
@@ -55,8 +52,6 @@ func (h *UserHandler) RegisterRoutes(app *fiber.App) {
 	apiUsersProtected := app.Group("/api/v1/users", h.middleware.auth.Handler)
 	apiUsersProtected.Get("/me", h.Me)
 	apiUsersProtected.Get("/me/posts", h.GetMyPosts)
-	apiUsersProtected.Get("/me/feed", h.GetMyFeed)
-	apiUsersProtected.Get("/me/reposts", h.GetMyReposts)
 	apiUsersProtected.Post("/:id/follow", h.FollowUser)
 	apiUsersProtected.Delete("/:id/follow", h.UnfollowUser)
 
@@ -191,26 +186,6 @@ func (h *UserHandler) GetMyPosts(ctx *fiber.Ctx) error {
 	})
 }
 
-func (h *UserHandler) GetMyReposts(ctx *fiber.Ctx) error {
-	user, err := GetUserFromCtx(ctx)
-	if err != nil {
-		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
-	}
-
-	reposts, err := h.service.repost.GetByUserID(ctx.Context(), user.ID.String())
-	if err != nil {
-		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
-	}
-
-	if reposts == nil {
-		reposts = []*aggregate.Post{}
-	}
-
-	return SuccessResponse(ctx, fiber.Map{
-		"reposts": reposts,
-	})
-}
-
 func (h *UserHandler) GetUserPosts(ctx *fiber.Ctx) error {
 	id := ctx.Params("id")
 	posts, err := h.service.post.GetByUserID(ctx.Context(), id)
@@ -244,10 +219,6 @@ func (h *UserHandler) FollowUser(ctx *fiber.Ctx) error {
 		FolloweeID: targetUser.ID,
 	})
 	if err != nil {
-		if errors.Is(err, entity.ErrFollowSelfFollow) {
-			return ErrorResponse(ctx, fiber.StatusBadRequest, err)
-		}
-
 		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
 	}
 
@@ -277,29 +248,138 @@ func (h *UserHandler) UnfollowUser(ctx *fiber.Ctx) error {
 	return SuccessResponse(ctx, nil)
 }
 
-func (h *UserHandler) GetMyFeed(ctx *fiber.Ctx) error {
-	user, err := GetUserFromCtx(ctx)
-	if err != nil {
-		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
+// Main
+
+package main
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"log"
+	"os"
+	"os/signal"
+	"social-media-go-ddd/internal/application/config"
+	"social-media-go-ddd/internal/application/http"
+	"social-media-go-ddd/internal/application/service"
+	"social-media-go-ddd/internal/domain/repository"
+	"social-media-go-ddd/internal/infrastructure/persistence/mysql"
+	"social-media-go-ddd/internal/infrastructure/persistence/postgres"
+	"syscall"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+func main() {
+	cfg := config.LoadConfig()
+	ctx := context.Background()
+
+	if err := cfg.DBDriverValid(); err != nil {
+		log.Fatalf("Database driver invalid error: %v", err)
 	}
 
-	p, pSize, limit, offset := parsePaginationParams(ctx)
+	var pool *pgxpool.Pool
+	var mysqlDB *sql.DB
 
-	feed, total, err := h.service.user.GetFeed(ctx.Context(), user.ID.String(), limit, offset)
-	if err != nil {
-		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	var err error
+
+	var userRepo repository.UserRepository
+	var sessionRepo repository.SessionRepository
+	var postRepo repository.PostRepository
+	var favoriteRepo repository.FavoriteRepository
+	var likeRepo repository.LikeRepository
+	var repostRepo repository.RepostRepository
+	var followRepo repository.FollowRepository
+
+	switch cfg.DBDriver {
+	case config.DB_DRIVER_PG:
+		pool, err = postgres.NewPgPool(ctx, cfg.BuildDSN())
+		if err != nil {
+			log.Fatalf("Failed to create Postgres pool: %v", err)
+		}
+		defer pool.Close()
+		log.Println("Postgres connection pool established")
+
+		userRepo = postgres.NewPgUserRepository(pool)
+		sessionRepo = postgres.NewPgSessionRepository(pool)
+		postRepo = postgres.NewPgPostRepository(pool)
+		favoriteRepo = postgres.NewPgFavoriteRepository(pool)
+		likeRepo = postgres.NewPgLikeRepository(pool)
+		repostRepo = postgres.NewPgRepostRepository(pool)
+		followRepo = postgres.NewPgFollowRepository(pool)
+	case config.DB_DRIVER_MYSQL:
+		mysqlDB, err = mysql.NewMySQLDB(cfg.BuildDSN())
+		if err != nil {
+			log.Fatalf("Failed to connect to MySQL: %v", err)
+		}
+		defer mysqlDB.Close()
+		log.Println("MySQL connection established")
+
+		userRepo = mysql.NewMySQLUserRepository(mysqlDB)
+		sessionRepo = mysql.NewMySQLSessionRepository(mysqlDB)
+		postRepo = mysql.NewMySQLPostRepository(mysqlDB)
+		favoriteRepo = mysql.NewMySQLFavoriteRepository(mysqlDB)
+		likeRepo = mysql.NewMySQLLikeRepository(mysqlDB)
+		repostRepo = mysql.NewMySQLRepostRepository(mysqlDB)
+		followRepo = mysql.NewMySQLFollowRepository(mysqlDB)
 	}
 
-	if feed == nil {
-		feed = []*aggregate.Post{}
+	userService := service.NewUserService(userRepo)
+	sessionService := service.NewSessionService(sessionRepo)
+	postService := service.NewPostService(postRepo)
+	favoriteService := service.NewFavoriteService(favoriteRepo)
+	likeService := service.NewLikeService(likeRepo)
+	repostService := service.NewRepostService(repostRepo)
+	followService := service.NewFollowService(followRepo)
+
+	authMiddleware := http.NewAuthMiddleware(sessionService, userService)
+
+	userHandler := http.NewUserHandler(userService, sessionService, postService, followService, authMiddleware)
+	postHandler := http.NewPostHandler(postService, likeService, repostService, favoriteService, authMiddleware)
+
+	app := fiber.New()
+	app.Use(recover.New())
+	app.Use(logger.New())
+
+	userHandler.RegisterRoutes(app)
+	postHandler.RegisterRoutes(app)
+
+	// Run server on another goroutine such that we can handle graceful shutdown
+	go func() {
+		fmt.Printf("Server running on port %s\n", cfg.AppPort)
+		if err := app.Listen(":" + cfg.AppPort); err != nil {
+			log.Printf("Fiber server stopped: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal to gracefully shutdown the server
+	sigCh := make(chan os.Signal, 1)
+	// SIGINT means Ctrl+C, SIGTERM is a termination signal
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	<-sigCh
+
+	log.Println("Shutting down server...")
+
+	if err := app.Shutdown(); err != nil {
+		log.Printf("Error during server shutdown: %v", err)
 	}
 
-	return SuccessResponse(ctx, fiber.Map{
-		"feed": feed,
-		"pagination": fiber.Map{
-			"page":     p,
-			"pageSize": pSize,
-			"total":    total,
-		},
-	})
+	if pool != nil {
+		log.Println("Closing postgres connection pool...")
+		pool.Close()
+	}
+
+	if mysqlDB != nil {
+		log.Println("Closing MySQL connection...")
+		if err := mysqlDB.Close(); err != nil {
+			log.Printf("Error closing MySQL connection: %v", err)
+		}
+	}
+
+	log.Println("Cleanup completed. Exiting application.")
+
+	log.Println("Server gracefully stopped.")
 }

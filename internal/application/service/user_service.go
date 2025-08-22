@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"social-media-go-ddd/internal/domain/aggregate"
 	"social-media-go-ddd/internal/domain/dto"
 	"social-media-go-ddd/internal/domain/entity"
 	"social-media-go-ddd/internal/domain/repository"
@@ -36,4 +37,9 @@ func (s *UserService) GetByID(ctx context.Context, id string) (*entity.User, err
 
 func (s *UserService) GetByName(ctx context.Context, name string) (*entity.User, error) {
 	return s.repository.FindByName(ctx, name)
+}
+
+// return posts, total, error
+func (s *UserService) GetFeed(ctx context.Context, userID string, limit, offset int) ([]*aggregate.Post, int, error) {
+	return s.repository.FindFeed(ctx, userID, limit, offset)
 }

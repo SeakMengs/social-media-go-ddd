@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"social-media-go-ddd/internal/domain/aggregate"
+	"social-media-go-ddd/internal/domain/dto"
 	"social-media-go-ddd/internal/domain/entity"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -38,22 +39,28 @@ func (r *PgPostRepository) FindByID(ctx context.Context, id string) (*aggregate.
 		SELECT post_id, COUNT(*) AS count FROM reposts GROUP BY post_id
 		) reposts_count ON reposts_count.post_id = posts.id
 		WHERE posts.id = $1`
-	var post aggregate.Post
+
+	var post entity.Post
+	var likeCount, favoriteCount, repostCount int
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&post.ID,
 		&post.UserID,
 		&post.Content,
 		&post.CreatedAt,
 		&post.UpdatedAt,
-		&post.LikeCount,
-		&post.FavoriteCount,
-		&post.RepostCount,
+		&likeCount,
+		&favoriteCount,
+		&repostCount,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	return &post, nil
+	return aggregate.NewPost(post, dto.CommonPostAggregate{
+		LikeCount:     likeCount,
+		FavoriteCount: favoriteCount,
+		RepostCount:   repostCount,
+	}), nil
 }
 
 func (r *PgPostRepository) FindByUserID(ctx context.Context, userID string) ([]*aggregate.Post, error) {
@@ -79,24 +86,33 @@ func (r *PgPostRepository) FindByUserID(ctx context.Context, userID string) ([]*
 
 	var posts []*aggregate.Post
 	for rows.Next() {
-		var p aggregate.Post
+		var post entity.Post
+		var likeCount, favoriteCount, repostCount int
+
 		if err := rows.Scan(
-			&p.ID,
-			&p.UserID,
-			&p.Content,
-			&p.CreatedAt,
-			&p.UpdatedAt,
-			&p.LikeCount,
-			&p.FavoriteCount,
-			&p.RepostCount,
+			&post.ID,
+			&post.UserID,
+			&post.Content,
+			&post.CreatedAt,
+			&post.UpdatedAt,
+			&likeCount,
+			&favoriteCount,
+			&repostCount,
 		); err != nil {
 			return nil, err
 		}
-		posts = append(posts, &p)
+
+		posts = append(posts, aggregate.NewPost(post, dto.CommonPostAggregate{
+			LikeCount:     likeCount,
+			FavoriteCount: favoriteCount,
+			RepostCount:   repostCount,
+		}))
 	}
+
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+
 	return posts, nil
 }
 

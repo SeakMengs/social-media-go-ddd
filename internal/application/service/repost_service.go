@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"social-media-go-ddd/internal/domain/aggregate"
 	"social-media-go-ddd/internal/domain/dto"
 	"social-media-go-ddd/internal/domain/entity"
 	"social-media-go-ddd/internal/domain/repository"
@@ -34,4 +35,13 @@ func (s *RepostService) Delete(ctx context.Context, dl dto.DeleteRepost) error {
 }
 func (s *RepostService) GetByID(ctx context.Context, id string) (*entity.Repost, error) {
 	return s.repository.FindByID(ctx, id)
+}
+
+func (s *RepostService) GetByUserID(ctx context.Context, userID string) ([]*aggregate.Post, error) {
+	reposts, err := s.repository.FindByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return reposts, nil
 }

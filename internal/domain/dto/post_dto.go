@@ -18,4 +18,10 @@ type (
 		UserID  uuid.UUID `json:"user_id"`
 		Content string    `json:"content"`
 	}
+
+	CommonPostAggregate struct {
+		LikeCount     int `json:"like_count"`
+		RepostCount   int `json:"repost_count"`
+		FavoriteCount int `json:"favorite_count"`
+	}
 )

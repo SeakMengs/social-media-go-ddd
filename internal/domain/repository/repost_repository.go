@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"social-media-go-ddd/internal/domain/aggregate"
 	"social-media-go-ddd/internal/domain/entity"
 )
 
@@ -10,4 +11,5 @@ type RepostRepository interface {
 	// Because a user can do many reposts, delete by id is enough
 	Delete(ctx context.Context, id string) error
 	FindByID(ctx context.Context, id string) (*entity.Repost, error)
+	FindByUserID(ctx context.Context, userID string) ([]*aggregate.Post, error)
 }

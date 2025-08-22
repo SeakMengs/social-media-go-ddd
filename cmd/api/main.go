@@ -85,7 +85,7 @@ func main() {
 
 	authMiddleware := http.NewAuthMiddleware(sessionService, userService)
 
-	userHandler := http.NewUserHandler(userService, sessionService, postService, followService, authMiddleware)
+	userHandler := http.NewUserHandler(userService, sessionService, postService, repostService, followService, authMiddleware)
 	postHandler := http.NewPostHandler(postService, likeService, repostService, favoriteService, authMiddleware)
 
 	app := fiber.New()
