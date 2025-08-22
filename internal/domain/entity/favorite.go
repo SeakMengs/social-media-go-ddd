@@ -1,7 +1,6 @@
 package entity
 
 import (
-	"errors"
 	"social-media-go-ddd/internal/domain/dto"
 
 	"github.com/google/uuid"
@@ -30,10 +29,10 @@ func (f *Favorite) Validate() error {
 		return err
 	}
 	if f.UserID == uuid.Nil {
-		return errors.New(ErrFavoriteUserIDEmpty)
+		return ErrFavoriteUserIDEmpty
 	}
 	if f.PostID == uuid.Nil {
-		return errors.New(ErrFavoritePostIDEmpty)
+		return ErrFavoritePostIDEmpty
 	}
 	return nil
 }

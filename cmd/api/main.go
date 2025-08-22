@@ -26,7 +26,7 @@ func main() {
 	ctx := context.Background()
 
 	if err := cfg.DBDriverValid(); err != nil {
-		log.Fatalf("Configuration error: %v", err)
+		log.Fatalf("Database driver invalid error: %v", err)
 	}
 
 	var pool *pgxpool.Pool
@@ -40,6 +40,7 @@ func main() {
 	var favoriteRepo repository.FavoriteRepository
 	var likeRepo repository.LikeRepository
 	var repostRepo repository.RepostRepository
+	var followRepo repository.FollowRepository
 
 	switch cfg.DBDriver {
 	case config.DB_DRIVER_PG:
@@ -56,6 +57,7 @@ func main() {
 		favoriteRepo = postgres.NewPgFavoriteRepository(pool)
 		likeRepo = postgres.NewPgLikeRepository(pool)
 		repostRepo = postgres.NewPgRepostRepository(pool)
+		followRepo = postgres.NewPgFollowRepository(pool)
 	case config.DB_DRIVER_MYSQL:
 		mysqlDB, err = mysql.NewMySQLDB(cfg.BuildDSN())
 		if err != nil {
@@ -70,6 +72,7 @@ func main() {
 		favoriteRepo = mysql.NewMySQLFavoriteRepository(mysqlDB)
 		likeRepo = mysql.NewMySQLLikeRepository(mysqlDB)
 		repostRepo = mysql.NewMySQLRepostRepository(mysqlDB)
+		followRepo = mysql.NewMySQLFollowRepository(mysqlDB)
 	}
 
 	userService := service.NewUserService(userRepo)
@@ -78,10 +81,11 @@ func main() {
 	favoriteService := service.NewFavoriteService(favoriteRepo)
 	likeService := service.NewLikeService(likeRepo)
 	repostService := service.NewRepostService(repostRepo)
+	followService := service.NewFollowService(followRepo)
 
 	authMiddleware := http.NewAuthMiddleware(sessionService, userService)
 
-	userHandler := http.NewUserHandler(userService, sessionService, postService, authMiddleware)
+	userHandler := http.NewUserHandler(userService, sessionService, postService, followService, authMiddleware)
 	postHandler := http.NewPostHandler(postService, likeService, repostService, favoriteService, authMiddleware)
 
 	app := fiber.New()
@@ -105,7 +109,7 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
 
-	log.Println("\nShutting down server...")
+	log.Println("Shutting down server...")
 
 	if err := app.Shutdown(); err != nil {
 		log.Printf("Error during server shutdown: %v", err)

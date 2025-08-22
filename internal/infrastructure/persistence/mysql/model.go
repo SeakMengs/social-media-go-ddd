@@ -188,3 +188,32 @@ func (s *Session) ToEntity() (*entity.Session, error) {
 		ExpireAt:   s.ExpireAt,
 	}, nil
 }
+
+type Follow struct {
+	BaseModel
+	FollowerID string `db:"follower_id"`
+	FolloweeID string `db:"followee_id"`
+}
+
+func (f *Follow) ToEntity() (*entity.Follow, error) {
+	if f == nil {
+		return nil, nil
+	}
+	baseEntity, err := f.BaseModel.ToEntity()
+	if err != nil {
+		return nil, err
+	}
+	followerID, err := entity.StringToUUID(f.FollowerID)
+	if err != nil {
+		return nil, err
+	}
+	followeeID, err := entity.StringToUUID(f.FolloweeID)
+	if err != nil {
+		return nil, err
+	}
+	return &entity.Follow{
+		BaseEntity: baseEntity,
+		FollowerID: followerID,
+		FolloweeID: followeeID,
+	}, nil
+}

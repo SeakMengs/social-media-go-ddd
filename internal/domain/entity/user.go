@@ -1,7 +1,6 @@
 package entity
 
 import (
-	"errors"
 	"social-media-go-ddd/internal/domain/dto"
 	"social-media-go-ddd/internal/domain/valueobject"
 	"strings"
@@ -37,13 +36,13 @@ func (u *User) Validate() error {
 		return err
 	}
 	if strings.TrimSpace(u.Username) == "" {
-		return errors.New(ErrUsernameEmpty)
+		return ErrUsernameEmpty
 	}
 	if strings.TrimSpace(u.Email) == "" {
-		return errors.New(ErrEmailEmpty)
+		return ErrEmailEmpty
 	}
 	if !strings.Contains(u.Email, "@") {
-		return errors.New(ErrEmailInvalid)
+		return ErrEmailInvalid
 	}
 
 	return nil

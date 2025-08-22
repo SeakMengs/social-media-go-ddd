@@ -1,7 +1,6 @@
 package entity
 
 import (
-	"errors"
 	"social-media-go-ddd/internal/domain/dto"
 	"time"
 
@@ -31,10 +30,10 @@ func (s *Session) Validate() error {
 		return err
 	}
 	if s.UserID == uuid.Nil {
-		return errors.New(ErrSessionUserIDEmpty)
+		return ErrSessionUserIDEmpty
 	}
 	if s.ExpireAt.Before(time.Now()) {
-		return errors.New(ErrSessionExpiredInPast)
+		return ErrSessionExpiredInPast
 	}
 	return nil
 }

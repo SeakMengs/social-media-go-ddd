@@ -1,36 +1,43 @@
 package entity
 
-const (
+import "errors"
+
+var (
 	// Common errors
-	ErrIDEmpty                 = "id cannot be empty"
-	ErrCreatedAtEmpty          = "created_at cannot be zero"
-	ErrUpdatedAtEmpty          = "updated_at cannot be zero"
-	ErrCreatedAtAfterUpdatedAt = "created_at must be before updated_at"
+	ErrIDEmpty                 = errors.New("id cannot be empty")
+	ErrCreatedAtEmpty          = errors.New("created_at cannot be zero")
+	ErrUpdatedAtEmpty          = errors.New("updated_at cannot be zero")
+	ErrCreatedAtAfterUpdatedAt = errors.New("created_at must be before updated_at")
 
 	// User errors
-	ErrUsernameEmpty = "username cannot be empty"
-	ErrEmailEmpty    = "email cannot be empty"
-	ErrEmailInvalid  = "invalid email format"
+	ErrUsernameEmpty = errors.New("username cannot be empty")
+	ErrEmailEmpty    = errors.New("email cannot be empty")
+	ErrEmailInvalid  = errors.New("invalid email format")
 
 	// Post errors
-	ErrUserIDEmpty    = "user_id cannot be null"
-	ErrContentEmpty   = "content cannot be empty"
-	ErrContentTooLong = "content exceeds maximum length"
+	ErrUserIDEmpty    = errors.New("user_id cannot be null")
+	ErrContentEmpty   = errors.New("content cannot be empty")
+	ErrContentTooLong = errors.New("content exceeds maximum length")
 
 	// Like errors
-	ErrLikeUserIDEmpty = "user_id cannot be null"
-	ErrLikePostIDEmpty = "post_id cannot be null"
+	ErrLikeUserIDEmpty = errors.New("user_id cannot be null")
+	ErrLikePostIDEmpty = errors.New("post_id cannot be null")
 
 	// Favorite errors
-	ErrFavoriteUserIDEmpty = "user_id cannot be null"
-	ErrFavoritePostIDEmpty = "post_id cannot be null"
+	ErrFavoriteUserIDEmpty = errors.New("user_id cannot be null")
+	ErrFavoritePostIDEmpty = errors.New("post_id cannot be null")
 
 	// Repost errors
-	ErrRepostUserIDEmpty    = "user_id cannot be null"
-	ErrRepostPostIDEmpty    = "post_id cannot be null"
-	ErrRepostCommentTooLong = "comment exceeds maximum length"
+	ErrRepostUserIDEmpty    = errors.New("user_id cannot be null")
+	ErrRepostPostIDEmpty    = errors.New("post_id cannot be null")
+	ErrRepostCommentTooLong = errors.New("comment exceeds maximum length")
 
 	// Session errors
-	ErrSessionUserIDEmpty   = "user_id cannot be null"
-	ErrSessionExpiredInPast = "session cannot expire in the past"
+	ErrSessionUserIDEmpty   = errors.New("user_id cannot be null")
+	ErrSessionExpiredInPast = errors.New("session cannot expire in the past")
+
+	// Follow errors
+	ErrFollowFollowerIDEmpty = errors.New("follower_id cannot be empty")
+	ErrFollowFolloweeIDEmpty = errors.New("followee_id cannot be empty")
+	ErrFollowSelfFollow      = errors.New("a user cannot follow themselves")
 )

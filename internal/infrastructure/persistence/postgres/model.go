@@ -157,3 +157,24 @@ func (s *Session) ToEntity() (*entity.Session, error) {
 		ExpireAt:   s.ExpireAt.Time,
 	}, nil
 }
+
+type Follow struct {
+	BaseModel
+	FollowerID pgtype.UUID `db:"follower_id"`
+	FolloweeID pgtype.UUID `db:"followee_id"`
+}
+
+func (f *Follow) ToEntity() (*entity.Follow, error) {
+	if f == nil {
+		return nil, nil
+	}
+	baseEntity, err := f.BaseModel.ToEntity()
+	if err != nil {
+		return nil, err
+	}
+	return &entity.Follow{
+		BaseEntity: baseEntity,
+		FollowerID: f.FollowerID.Bytes,
+		FolloweeID: f.FolloweeID.Bytes,
+	}, nil
+}

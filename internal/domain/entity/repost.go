@@ -1,7 +1,6 @@
 package entity
 
 import (
-	"errors"
 	"social-media-go-ddd/internal/domain/dto"
 	"strings"
 	"time"
@@ -34,13 +33,13 @@ func (r *Repost) Validate() error {
 		return err
 	}
 	if r.UserID == uuid.Nil {
-		return errors.New(ErrRepostUserIDEmpty)
+		return ErrRepostUserIDEmpty
 	}
 	if r.PostID == uuid.Nil {
-		return errors.New(ErrRepostPostIDEmpty)
+		return ErrRepostPostIDEmpty
 	}
 	if len(r.Comment) > 1000 {
-		return errors.New(ErrRepostCommentTooLong)
+		return ErrRepostCommentTooLong
 	}
 	return nil
 }

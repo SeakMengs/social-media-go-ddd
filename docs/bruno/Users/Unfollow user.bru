@@ -1,0 +1,15 @@
+meta {
+  name: Unfollow user
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{url}}/api/v1/users/efe61ee3-784d-4718-b47e-3f57d3dc675c/follow
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}

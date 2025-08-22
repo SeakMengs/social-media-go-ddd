@@ -1,7 +1,6 @@
 package entity
 
 import (
-	"errors"
 	"social-media-go-ddd/internal/domain/dto"
 
 	"github.com/google/uuid"
@@ -30,10 +29,10 @@ func (l *Like) Validate() error {
 		return err
 	}
 	if l.UserID == uuid.Nil {
-		return errors.New(ErrLikeUserIDEmpty)
+		return ErrLikeUserIDEmpty
 	}
 	if l.PostID == uuid.Nil {
-		return errors.New(ErrLikePostIDEmpty)
+		return ErrLikePostIDEmpty
 	}
 	return nil
 }

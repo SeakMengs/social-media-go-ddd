@@ -1,7 +1,6 @@
 package entity
 
 import (
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,16 +26,16 @@ func (b *BaseEntity) UpdateTimestamp() {
 
 func (b *BaseEntity) Validate() error {
 	if b.ID == uuid.Nil {
-		return errors.New(ErrIDEmpty)
+		return ErrIDEmpty
 	}
 	if b.CreatedAt.IsZero() {
-		return errors.New(ErrCreatedAtEmpty)
+		return ErrCreatedAtEmpty
 	}
 	if b.UpdatedAt.IsZero() {
-		return errors.New(ErrUpdatedAtEmpty)
+		return ErrUpdatedAtEmpty
 	}
 	if b.CreatedAt.After(b.UpdatedAt) {
-		return errors.New(ErrCreatedAtAfterUpdatedAt)
+		return ErrCreatedAtAfterUpdatedAt
 	}
 	return nil
 }

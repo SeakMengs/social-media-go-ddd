@@ -5,6 +5,7 @@ import (
 	"social-media-go-ddd/internal/application/service"
 	"social-media-go-ddd/internal/domain/aggregate"
 	"social-media-go-ddd/internal/domain/dto"
+	"social-media-go-ddd/internal/domain/entity"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -14,13 +15,15 @@ type UserHandlerService struct {
 	user    *service.UserService
 	session *service.SessionService
 	post    *service.PostService
+	follow  *service.FollowService
 }
 
-func NewUserHandlerService(user *service.UserService, session *service.SessionService, post *service.PostService) *UserHandlerService {
+func NewUserHandlerService(user *service.UserService, session *service.SessionService, post *service.PostService, follow *service.FollowService) *UserHandlerService {
 	return &UserHandlerService{
 		user:    user,
 		session: session,
 		post:    post,
+		follow:  follow,
 	}
 }
 
@@ -39,9 +42,9 @@ type UserHandler struct {
 	middleware *UserHandlerMiddleware
 }
 
-func NewUserHandler(userService *service.UserService, sessionService *service.SessionService, postService *service.PostService, authMiddleware *AuthMiddleware) *UserHandler {
+func NewUserHandler(userService *service.UserService, sessionService *service.SessionService, postService *service.PostService, followService *service.FollowService, authMiddleware *AuthMiddleware) *UserHandler {
 	return &UserHandler{
-		service:    NewUserHandlerService(userService, sessionService, postService),
+		service:    NewUserHandlerService(userService, sessionService, postService, followService),
 		middleware: NewUserHandlerMiddleware(authMiddleware),
 	}
 }
@@ -50,7 +53,10 @@ func (h *UserHandler) RegisterRoutes(app *fiber.App) {
 	apiUsersProtected := app.Group("/api/v1/users", h.middleware.auth.Handler)
 	apiUsersProtected.Get("/me", h.Me)
 	apiUsersProtected.Get("/me/posts", h.GetMyPosts)
+	apiUsersProtected.Post("/:id/follow", h.FollowUser)
+	apiUsersProtected.Delete("/:id/follow", h.UnfollowUser)
 
+	// Public user routes
 	apiUsers := app.Group("/api/v1/users")
 	apiUsers.Get("/:id", h.GetUserByID)
 	apiUsers.Get("/:id/posts", h.GetUserPosts)
@@ -195,4 +201,54 @@ func (h *UserHandler) GetUserPosts(ctx *fiber.Ctx) error {
 	return SuccessResponse(ctx, fiber.Map{
 		"posts": posts,
 	})
+}
+
+func (h *UserHandler) FollowUser(ctx *fiber.Ctx) error {
+	user, err := GetUserFromCtx(ctx)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
+	}
+
+	targetID := ctx.Params("id")
+	targetUser, err := h.service.user.GetByID(ctx.Context(), targetID)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusNotFound, err)
+	}
+
+	_, err = h.service.follow.Create(ctx.Context(), dto.NewFollow{
+		FollowerID: user.ID,
+		FolloweeID: targetUser.ID,
+	})
+	if err != nil {
+		if errors.Is(err, entity.ErrFollowSelfFollow) {
+			return ErrorResponse(ctx, fiber.StatusBadRequest, err)
+		}
+
+		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	}
+
+	return SuccessResponse(ctx, nil)
+}
+
+func (h *UserHandler) UnfollowUser(ctx *fiber.Ctx) error {
+	user, err := GetUserFromCtx(ctx)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
+	}
+
+	targetID := ctx.Params("id")
+	targetUser, err := h.service.user.GetByID(ctx.Context(), targetID)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusNotFound, err)
+	}
+
+	err = h.service.follow.Delete(ctx.Context(), dto.DeleteFollow{
+		FollowerID: user.ID,
+		FolloweeID: targetUser.ID,
+	})
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	}
+
+	return SuccessResponse(ctx, nil)
 }

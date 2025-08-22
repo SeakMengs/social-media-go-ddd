@@ -1,7 +1,6 @@
 package entity
 
 import (
-	"errors"
 	"social-media-go-ddd/internal/domain/dto"
 	"strings"
 	"time"
@@ -45,16 +44,16 @@ func (p *Post) Validate() error {
 		return err
 	}
 	if p.UserID == uuid.Nil {
-		return errors.New(ErrUserIDEmpty)
+		return ErrUserIDEmpty
 	}
 	if strings.TrimSpace(p.Content) == "" {
-		return errors.New(ErrContentEmpty)
+		return ErrContentEmpty
 	}
 	if len(p.Content) > 5000 {
-		return errors.New(ErrContentTooLong)
+		return ErrContentTooLong
 	}
 	if p.CreatedAt.After(p.UpdatedAt) {
-		return errors.New(ErrCreatedAtAfterUpdatedAt)
+		return ErrCreatedAtAfterUpdatedAt
 	}
 	return nil
 }
