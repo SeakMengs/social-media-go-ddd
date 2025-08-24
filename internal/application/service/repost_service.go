@@ -31,6 +31,8 @@ func (s *RepostService) Create(ctx context.Context, nf dto.NewRepost) (*entity.R
 		return nil, err
 	}
 
+	// Invalidate post cache since repost count changed
+	s.cache.Delete(ctx, s.cacheKeys.Post(repost.PostID.String()))
 	// Invalidate user reposts cache
 	s.cache.Delete(ctx, s.cacheKeys.UserReposts(repost.UserID.String()))
 	s.cache.DeleteByPattern(ctx, s.cacheKeys.UserFeedPattern(repost.UserID.String()))
@@ -39,9 +41,11 @@ func (s *RepostService) Create(ctx context.Context, nf dto.NewRepost) (*entity.R
 }
 
 func (s *RepostService) Delete(ctx context.Context, dl dto.DeleteRepost) error {
-	// Get the repost first to get the user ID for cache invalidation
+	// Get the repost first to get the user ID and post ID for cache invalidation
 	repost, err := s.repository.FindByID(ctx, dl.ID)
 	if err == nil && repost != nil {
+		// Invalidate post cache since repost count changed
+		s.cache.Delete(ctx, s.cacheKeys.Post(repost.PostID.String()))
 		s.cache.Delete(ctx, s.cacheKeys.UserReposts(repost.UserID.String()))
 		s.cache.DeleteByPattern(ctx, s.cacheKeys.UserFeedPattern(repost.UserID.String()))
 	}
@@ -58,7 +62,17 @@ func (s *RepostService) GetByID(ctx context.Context, id string) (*entity.Repost,
 		}
 	}
 
-	return s.repository.FindByID(ctx, id)
+	repost, err := s.repository.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(repost)
+	if err == nil {
+		s.cache.Set(ctx, cacheKey, data, cache.DefaultTTL())
+	}
+
+	return repost, nil
 }
 
 func (s *RepostService) GetByUserID(ctx context.Context, userID string) ([]*aggregate.Post, error) {

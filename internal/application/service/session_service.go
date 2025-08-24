@@ -37,8 +37,12 @@ func (s *SessionService) GetByID(ctx context.Context, id string) (*entity.Sessio
 	val, err := s.cache.Get(ctx, cacheKey)
 	if !cache.IsCacheError(err) {
 		var session entity.Session
-		if json.Unmarshal([]byte(val), &session) == nil && !session.IsExpired() {
-			return &session, nil
+		if json.Unmarshal([]byte(val), &session) == nil {
+			if !session.IsExpired() {
+				return &session, nil
+			}
+			// Delete expired session from cache
+			s.cache.Delete(ctx, cacheKey)
 		}
 	}
 
