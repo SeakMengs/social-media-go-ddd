@@ -11,6 +11,8 @@ import (
 	"social-media-go-ddd/internal/application/http"
 	"social-media-go-ddd/internal/application/service"
 	"social-media-go-ddd/internal/domain/repository"
+	"social-media-go-ddd/internal/infrastructure/cache"
+	"social-media-go-ddd/internal/infrastructure/cache/redis"
 	"social-media-go-ddd/internal/infrastructure/persistence/mysql"
 	"social-media-go-ddd/internal/infrastructure/persistence/postgres"
 	"syscall"
@@ -25,7 +27,7 @@ func main() {
 	cfg := config.LoadConfig()
 	ctx := context.Background()
 
-	if err := cfg.DBDriverValid(); err != nil {
+	if err := cfg.DB.DriverValid(); err != nil {
 		log.Fatalf("Database driver invalid error: %v", err)
 	}
 
@@ -42,9 +44,9 @@ func main() {
 	var repostRepo repository.RepostRepository
 	var followRepo repository.FollowRepository
 
-	switch cfg.DBDriver {
+	switch cfg.DB.Driver {
 	case config.DB_DRIVER_PG:
-		pool, err = postgres.NewPgPool(ctx, cfg.BuildDSN())
+		pool, err = postgres.NewPgPool(ctx, cfg.DB.BuildDSN())
 		if err != nil {
 			log.Fatalf("Failed to create Postgres pool: %v", err)
 		}
@@ -59,7 +61,7 @@ func main() {
 		repostRepo = postgres.NewPgRepostRepository(pool)
 		followRepo = postgres.NewPgFollowRepository(pool)
 	case config.DB_DRIVER_MYSQL:
-		mysqlDB, err = mysql.NewMySQLDB(cfg.BuildDSN())
+		mysqlDB, err = mysql.NewMySQLDB(cfg.DB.BuildDSN())
 		if err != nil {
 			log.Fatalf("Failed to connect to MySQL: %v", err)
 		}
@@ -75,13 +77,16 @@ func main() {
 		followRepo = mysql.NewMySQLFollowRepository(mysqlDB)
 	}
 
-	userService := service.NewUserService(userRepo)
-	sessionService := service.NewSessionService(sessionRepo)
-	postService := service.NewPostService(postRepo)
-	favoriteService := service.NewFavoriteService(favoriteRepo)
-	likeService := service.NewLikeService(likeRepo)
-	repostService := service.NewRepostService(repostRepo)
-	followService := service.NewFollowService(followRepo)
+	var cacheClient cache.Cache
+	cacheClient = redis.NewRedisCache(cfg.Redis.Addr(), cfg.Redis.Password, cfg.Redis.DB, cfg.DB.Driver)
+
+	userService := service.NewUserService(userRepo, cacheClient)
+	sessionService := service.NewSessionService(sessionRepo, cacheClient)
+	postService := service.NewPostService(postRepo, cacheClient)
+	favoriteService := service.NewFavoriteService(favoriteRepo, cacheClient)
+	likeService := service.NewLikeService(likeRepo, cacheClient)
+	repostService := service.NewRepostService(repostRepo, cacheClient)
+	followService := service.NewFollowService(followRepo, cacheClient)
 
 	authMiddleware := http.NewAuthMiddleware(sessionService, userService)
 

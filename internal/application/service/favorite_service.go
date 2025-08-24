@@ -5,15 +5,18 @@ import (
 	"social-media-go-ddd/internal/domain/dto"
 	"social-media-go-ddd/internal/domain/entity"
 	"social-media-go-ddd/internal/domain/repository"
+	"social-media-go-ddd/internal/infrastructure/cache"
 )
 
 type FavoriteService struct {
+	baseService
 	repository repository.FavoriteRepository
 }
 
-func NewFavoriteService(repo repository.FavoriteRepository) *FavoriteService {
+func NewFavoriteService(repo repository.FavoriteRepository, c cache.Cache) *FavoriteService {
 	return &FavoriteService{
-		repository: repo,
+		baseService: NewBaseService(c),
+		repository:  repo,
 	}
 }
 

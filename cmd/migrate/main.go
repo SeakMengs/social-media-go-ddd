@@ -23,27 +23,27 @@ func main() {
 
 	var migrationsPath string
 
-	switch cfg.DBDriver {
+	switch cfg.DB.Driver {
 	case config.DB_DRIVER_PG:
 		migrationsPath = "file://internal/infrastructure/persistence/postgres/migrations"
 	case config.DB_DRIVER_MYSQL:
 		migrationsPath = "file://internal/infrastructure/persistence/mysql/migrations"
 	default:
-		log.Fatalf("Unsupported DB driver: %s", cfg.DBDriver)
+		log.Fatalf("Unsupported DB.driver: %s", cfg.DB.Driver)
 	}
 
 	// DSN compatible with golang-migrate
 	var dsn string
-	switch cfg.DBDriver {
+	switch cfg.DB.Driver {
 	case config.DB_DRIVER_PG:
 		dsn = fmt.Sprintf(
 			"postgres://%s:%s@%s:%s/%s?sslmode=disable",
-			cfg.DBUser, cfg.DBPassword, cfg.DBHost, cfg.DBPort, cfg.DBName,
+			cfg.DB.User, cfg.DB.Password, cfg.DB.Host, cfg.DB.Port, cfg.DB.Name,
 		)
 	case config.DB_DRIVER_MYSQL:
 		dsn = fmt.Sprintf(
 			"mysql://%s:%s@tcp(%s:%s)/%s",
-			cfg.DBUser, cfg.DBPassword, cfg.DBHost, cfg.DBPort, cfg.DBName,
+			cfg.DB.User, cfg.DB.Password, cfg.DB.Host, cfg.DB.Port, cfg.DB.Name,
 		)
 	}
 

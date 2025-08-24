@@ -15,9 +15,14 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
       PORT: ${PORT}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_DB: ${REDIS_DB}
     depends_on:
       - psql-db
       - mysql-db
+      - redis
     command: ["air", "-c", ".air.toml"]
 
   psql-db:
@@ -42,7 +47,14 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-
+  redis:
+      image: redis:7
+      ports:
+        - "6379:6379"
+      volumes:
+        - redis_data:/data
+      command: ["redis-server", "--appendonly", "yes"]
 volumes:
   psql_db_data:
   mysql_data:
+  redis_data:

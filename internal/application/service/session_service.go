@@ -5,15 +5,18 @@ import (
 	"social-media-go-ddd/internal/domain/dto"
 	"social-media-go-ddd/internal/domain/entity"
 	"social-media-go-ddd/internal/domain/repository"
+	"social-media-go-ddd/internal/infrastructure/cache"
 )
 
 type SessionService struct {
+	baseService
 	repository repository.SessionRepository
 }
 
-func NewSessionService(repo repository.SessionRepository) *SessionService {
+func NewSessionService(repo repository.SessionRepository, c cache.Cache) *SessionService {
 	return &SessionService{
-		repository: repo,
+		repository:  repo,
+		baseService: NewBaseService(c),
 	}
 }
 

@@ -6,15 +6,18 @@ import (
 	"social-media-go-ddd/internal/domain/dto"
 	"social-media-go-ddd/internal/domain/entity"
 	"social-media-go-ddd/internal/domain/repository"
+	"social-media-go-ddd/internal/infrastructure/cache"
 )
 
 type UserService struct {
+	baseService
 	repository repository.UserRepository
 }
 
-func NewUserService(repo repository.UserRepository) *UserService {
+func NewUserService(repo repository.UserRepository, c cache.Cache) *UserService {
 	return &UserService{
-		repository: repo,
+		baseService: NewBaseService(c),
+		repository:  repo,
 	}
 }
 

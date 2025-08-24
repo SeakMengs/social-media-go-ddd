@@ -5,15 +5,18 @@ import (
 	"social-media-go-ddd/internal/domain/dto"
 	"social-media-go-ddd/internal/domain/entity"
 	"social-media-go-ddd/internal/domain/repository"
+	"social-media-go-ddd/internal/infrastructure/cache"
 )
 
 type LikeService struct {
+	baseService
 	repository repository.LikeRepository
 }
 
-func NewLikeService(repo repository.LikeRepository) *LikeService {
+func NewLikeService(repo repository.LikeRepository, c cache.Cache) *LikeService {
 	return &LikeService{
-		repository: repo,
+		baseService: NewBaseService(c),
+		repository:  repo,
 	}
 }
 

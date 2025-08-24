@@ -6,15 +6,18 @@ import (
 	"social-media-go-ddd/internal/domain/dto"
 	"social-media-go-ddd/internal/domain/entity"
 	"social-media-go-ddd/internal/domain/repository"
+	"social-media-go-ddd/internal/infrastructure/cache"
 )
 
 type RepostService struct {
+	baseService
 	repository repository.RepostRepository
 }
 
-func NewRepostService(repo repository.RepostRepository) *RepostService {
+func NewRepostService(repo repository.RepostRepository, c cache.Cache) *RepostService {
 	return &RepostService{
-		repository: repo,
+		baseService: NewBaseService(c),
+		repository:  repo,
 	}
 }
 

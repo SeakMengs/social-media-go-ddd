@@ -5,15 +5,18 @@ import (
 	"social-media-go-ddd/internal/domain/dto"
 	"social-media-go-ddd/internal/domain/entity"
 	"social-media-go-ddd/internal/domain/repository"
+	"social-media-go-ddd/internal/infrastructure/cache"
 )
 
 type FollowService struct {
+	baseService
 	repository repository.FollowRepository
 }
 
-func NewFollowService(repo repository.FollowRepository) *FollowService {
+func NewFollowService(repo repository.FollowRepository, c cache.Cache) *FollowService {
 	return &FollowService{
-		repository: repo,
+		baseService: NewBaseService(c),
+		repository:  repo,
 	}
 }
 
