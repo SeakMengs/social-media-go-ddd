@@ -283,7 +283,8 @@ func (h *UserHandler) GetMyFeed(ctx *fiber.Ctx) error {
 		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
 	}
 
-	p, pSize, limit, offset := parsePaginationParams(ctx)
+	p, pSize := getPaginationParams(ctx)
+	limit, offset := paginationToLimitOffset(p, pSize)
 
 	feed, total, err := h.service.user.GetFeed(ctx.Context(), user.ID.String(), limit, offset)
 	if err != nil {

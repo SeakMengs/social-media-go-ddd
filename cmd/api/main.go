@@ -78,7 +78,10 @@ func main() {
 	}
 
 	var cacheClient cache.Cache
-	cacheClient = redis.NewRedisCache(cfg.Redis.Addr(), cfg.Redis.Password, cfg.Redis.DB, cfg.DB.Driver)
+	cacheClient, err = redis.NewRedisCache(ctx, cfg.Redis.Addr(), cfg.Redis.Password, cfg.Redis.DB, cfg.DB.Driver)
+	if err != nil {
+		log.Fatalf("Failed to connect Redis cache: %v", err)
+	}
 
 	userService := service.NewUserService(userRepo, cacheClient)
 	sessionService := service.NewSessionService(sessionRepo, cacheClient)
@@ -130,6 +133,11 @@ func main() {
 		if err := mysqlDB.Close(); err != nil {
 			log.Printf("Error closing MySQL connection: %v", err)
 		}
+	}
+
+	log.Println("Closing cache connection...")
+	if err := cacheClient.Close(); err != nil {
+		log.Printf("Error closing cache connection: %v", err)
 	}
 
 	log.Println("Cleanup completed. Exiting application.")

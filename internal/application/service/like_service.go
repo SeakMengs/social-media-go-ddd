@@ -25,14 +25,17 @@ func (s *LikeService) Create(ctx context.Context, nl dto.NewLike) (*entity.Like,
 	if err != nil {
 		return nil, err
 	}
-
 	if err = s.repository.Save(ctx, like); err != nil {
 		return nil, err
 	}
 
+	// Invalidate post cache since like count changed
+	s.cache.Delete(ctx, s.cacheKeys.Post(like.PostID.String()))
 	return like, nil
 }
 
 func (s *LikeService) Delete(ctx context.Context, dl dto.DeleteLike) error {
+	// Invalidate post cache since like count changed
+	s.cache.Delete(ctx, s.cacheKeys.Post(dl.PostID.String()))
 	return s.repository.Delete(ctx, dl.UserID.String(), dl.PostID.String())
 }

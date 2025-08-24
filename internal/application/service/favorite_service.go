@@ -25,14 +25,17 @@ func (s *FavoriteService) Create(ctx context.Context, nf dto.NewFavorite) (*enti
 	if err != nil {
 		return nil, err
 	}
-
 	if err = s.repository.Save(ctx, favorite); err != nil {
 		return nil, err
 	}
 
+	// Invalidate post cache since favorite count changed
+	s.cache.Delete(ctx, s.cacheKeys.Post(favorite.PostID.String()))
 	return favorite, nil
 }
 
 func (s *FavoriteService) Delete(ctx context.Context, dl dto.DeleteFavorite) error {
+	// Invalidate post cache since favorite count changed
+	s.cache.Delete(ctx, s.cacheKeys.Post(dl.PostID.String()))
 	return s.repository.Delete(ctx, dl.UserID.String(), dl.PostID.String())
 }
