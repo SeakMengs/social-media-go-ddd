@@ -44,3 +44,9 @@ func (r *PgSessionRepository) Delete(ctx context.Context, id string) error {
 	_, err := r.pool.Exec(ctx, query, id)
 	return err
 }
+
+func (r *PgSessionRepository) UpdateExpireAt(ctx context.Context, s *entity.Session) error {
+	query := `UPDATE sessions SET expire_at = $1, updated_at = $2 WHERE id = $3`
+	_, err := r.pool.Exec(ctx, query, s.ExpireAt, s.UpdatedAt, s.ID)
+	return err
+}

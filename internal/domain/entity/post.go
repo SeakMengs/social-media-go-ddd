@@ -3,7 +3,6 @@ package entity
 import (
 	"social-media-go-ddd/internal/domain/dto"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -32,10 +31,10 @@ func NewPostForUpdate(oldPost *Post, up dto.UpdatePost) (*Post, error) {
 		UserID:     oldPost.UserID,
 		Content:    strings.TrimSpace(up.Content),
 	}
+	post.UpdateTimestamp()
 	if err := post.Validate(); err != nil {
 		return nil, err
 	}
-	post.UpdatedAt = time.Now()
 	return post, nil
 }
 
@@ -60,6 +59,6 @@ func (p *Post) Validate() error {
 
 func (p *Post) UpdateContent(content string) error {
 	p.Content = strings.TrimSpace(content)
-	p.UpdatedAt = time.Now()
+	p.UpdateTimestamp()
 	return p.Validate()
 }

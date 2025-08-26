@@ -13,7 +13,7 @@ const (
 )
 
 type Password struct {
-	hash string
+	hash string `json:"-"`
 }
 
 func NewPassword(plain string) (Password, error) {

@@ -105,13 +105,42 @@ func (h *UserHandler) GetUserByID(ctx *fiber.Ctx) error {
 }
 
 func (h *UserHandler) Me(ctx *fiber.Ctx) error {
+	session, err := GetSessionFromCtx(ctx)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
+	}
+
 	user, err := GetUserFromCtx(ctx)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
 	}
 
+	now := time.Now()
+	if session.ExpireAt.Before(now) {
+		_ = h.service.session.Delete(ctx.Context(), dto.DeleteSession{ID: session.ID.String()})
+		return ErrorResponse(ctx, fiber.StatusUnauthorized, errors.New("session expired"))
+	}
+
+	// Refresh session if less than 1 day left
+	refreshThreshold := now.Add(24 * time.Hour)
+	if session.ExpireAt.Before(refreshThreshold) {
+		newSession, err := h.service.session.UpdateExpireAt(ctx.Context(), session, dto.UpdateSessionExpireAt{
+			ExpireAt: entity.DefaultSessionExpireAt(),
+			ID:       session.ID.String(),
+		})
+		if err != nil {
+			return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+		}
+
+		return SuccessResponse(ctx, fiber.Map{
+			"session": newSession,
+			"user":    user,
+		})
+	}
+
 	return SuccessResponse(ctx, fiber.Map{
-		"user": user,
+		"session": session,
+		"user":    user,
 	})
 }
 
@@ -136,18 +165,15 @@ func (h *UserHandler) Login(ctx *fiber.Ctx) error {
 
 	session, err := h.service.session.Create(ctx.Context(), dto.NewSession{
 		UserID:   user.ID,
-		ExpireAt: time.Now().Add(24 * time.Hour),
+		ExpireAt: entity.DefaultSessionExpireAt(),
 	})
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
 	}
 
 	return SuccessResponse(ctx, fiber.Map{
-		"session": fiber.Map{
-			"id":        session.ID.String(),
-			"expire_at": session.ExpireAt,
-		},
-		"user": user,
+		"session": session,
+		"user":    user,
 	})
 }
 

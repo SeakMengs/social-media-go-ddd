@@ -13,12 +13,29 @@ type Session struct {
 	ExpireAt time.Time `json:"expireAt"`
 }
 
+func DefaultSessionExpireAt() time.Time {
+	return time.Now().Add(7 * 24 * time.Hour)
+}
+
 func NewSession(ns dto.NewSession) (*Session, error) {
 	session := &Session{
 		BaseEntity: NewBaseEntity(),
 		UserID:     ns.UserID,
 		ExpireAt:   ns.ExpireAt,
 	}
+	if err := session.Validate(); err != nil {
+		return nil, err
+	}
+	return session, nil
+}
+
+func NewSessionForUpdate(oldSession *Session, up dto.UpdateSessionExpireAt) (*Session, error) {
+	session := &Session{
+		BaseEntity: oldSession.BaseEntity,
+		UserID:     oldSession.UserID,
+		ExpireAt:   up.ExpireAt,
+	}
+	session.UpdateTimestamp()
 	if err := session.Validate(); err != nil {
 		return nil, err
 	}
@@ -32,12 +49,18 @@ func (s *Session) Validate() error {
 	if s.UserID == uuid.Nil {
 		return ErrSessionUserIDEmpty
 	}
-	if s.ExpireAt.Before(time.Now()) {
-		return ErrSessionExpiredInPast
+	if s.IsExpired() {
+		return ErrSessionExpired
 	}
 	return nil
 }
 
 func (s *Session) IsExpired() bool {
 	return s.ExpireAt.Before(time.Now())
+}
+
+func (s *Session) UpdateExpireAt(expireAt time.Time) error {
+	s.ExpireAt = expireAt
+	s.UpdateTimestamp()
+	return s.Validate()
 }

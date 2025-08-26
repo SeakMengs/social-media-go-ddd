@@ -3,7 +3,6 @@ package entity
 import (
 	"social-media-go-ddd/internal/domain/dto"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -46,6 +45,6 @@ func (r *Repost) Validate() error {
 
 func (r *Repost) UpdateComment(comment string) error {
 	r.Comment = strings.TrimSpace(comment)
-	r.UpdatedAt = time.Now()
+	r.UpdateTimestamp()
 	return r.Validate()
 }

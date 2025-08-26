@@ -61,9 +61,9 @@ func (s *UserService) GetByName(ctx context.Context, name string) (*entity.User,
 	cacheKey := s.cacheKeys.UserByName(name)
 	val, err := s.cache.Get(ctx, cacheKey)
 	if !cache.IsCacheError(err) {
-		var user entity.User
-		if json.Unmarshal([]byte(val), &user) == nil {
-			return &user, nil
+		user, err := entity.UserUnmarshalJson([]byte(val))
+		if err == nil {
+			return user, nil
 		}
 	}
 
@@ -72,7 +72,7 @@ func (s *UserService) GetByName(ctx context.Context, name string) (*entity.User,
 		return nil, err
 	}
 
-	data, err := json.Marshal(user)
+	data, err := user.MarshalJson()
 	if err == nil {
 		s.cache.Set(ctx, cacheKey, data, cache.DefaultTTL())
 	}

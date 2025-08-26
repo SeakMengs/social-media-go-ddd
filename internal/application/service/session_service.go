@@ -65,3 +65,15 @@ func (s *SessionService) Delete(ctx context.Context, ds dto.DeleteSession) error
 	s.cache.Delete(ctx, s.cacheKeys.Session(ds.ID))
 	return s.repository.Delete(ctx, ds.ID)
 }
+
+func (s *SessionService) UpdateExpireAt(ctx context.Context, old *entity.Session, up dto.UpdateSessionExpireAt) (*entity.Session, error) {
+	session, err := entity.NewSessionForUpdate(old, up)
+	if err != nil {
+		return nil, err
+	}
+	if err = s.repository.UpdateExpireAt(ctx, session); err != nil {
+		return nil, err
+	}
+	s.cache.Delete(ctx, s.cacheKeys.Session(session.ID.String()))
+	return session, nil
+}

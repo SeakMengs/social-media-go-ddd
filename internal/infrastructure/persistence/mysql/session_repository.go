@@ -41,3 +41,9 @@ func (r *MySQLSessionRepository) Delete(ctx context.Context, id string) error {
 	_, err := r.db.ExecContext(ctx, query, id)
 	return err
 }
+
+func (r *MySQLSessionRepository) UpdateExpireAt(ctx context.Context, s *entity.Session) error {
+	query := `UPDATE sessions SET expire_at = ?, updated_at = ? WHERE id = ?`
+	_, err := r.db.ExecContext(ctx, query, s.ExpireAt, s.UpdatedAt, s.ID)
+	return err
+}

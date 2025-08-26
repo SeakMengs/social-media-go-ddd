@@ -1,10 +1,10 @@
 package entity
 
 import (
+	"encoding/json"
 	"social-media-go-ddd/internal/domain/dto"
 	"social-media-go-ddd/internal/domain/valueobject"
 	"strings"
-	"time"
 )
 
 type User struct {
@@ -12,6 +12,30 @@ type User struct {
 	Username string               `json:"username"`
 	Email    string               `json:"email"`
 	Password valueobject.Password `json:"-"`
+}
+
+// MarshalJSON includes the password field.
+func (u *User) MarshalJson() ([]byte, error) {
+	return json.Marshal(struct {
+		User
+		Password string `json:"password"`
+	}{
+		User:     *u,
+		Password: u.Password.GetHash(),
+	})
+}
+
+// UnmarshalJSON includes the password field.
+func UserUnmarshalJson(data []byte) (*User, error) {
+	u := struct {
+		User
+		Password string `json:"password"`
+	}{}
+	if err := json.Unmarshal(data, &u); err != nil {
+		return nil, err
+	}
+	u.User.Password = valueobject.PasswordFromHash(u.Password)
+	return &u.User, nil
 }
 
 func NewUser(nu dto.NewUser) (*User, error) {
@@ -54,18 +78,18 @@ func (u *User) UpdatePassword(password string) error {
 		return err
 	}
 	u.Password = hashPw
-	u.UpdatedAt = time.Now()
+	u.UpdateTimestamp()
 	return u.Validate()
 }
 
 func (u *User) UpdateUsername(username string) error {
 	u.Username = strings.TrimSpace(username)
-	u.UpdatedAt = time.Now()
+	u.UpdateTimestamp()
 	return u.Validate()
 }
 
 func (u *User) UpdateEmail(email string) error {
 	u.Email = strings.TrimSpace(strings.ToLower(email))
-	u.UpdatedAt = time.Now()
+	u.UpdateTimestamp()
 	return u.Validate()
 }

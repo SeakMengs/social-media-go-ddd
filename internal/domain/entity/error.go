@@ -33,8 +33,8 @@ var (
 	ErrRepostCommentTooLong = errors.New("comment exceeds maximum length")
 
 	// Session errors
-	ErrSessionUserIDEmpty   = errors.New("user_id cannot be null")
-	ErrSessionExpiredInPast = errors.New("session cannot expire in the past")
+	ErrSessionUserIDEmpty = errors.New("user_id cannot be null")
+	ErrSessionExpired     = errors.New("session expired")
 
 	// Follow errors
 	ErrFollowFollowerIDEmpty = errors.New("follower_id cannot be empty")
