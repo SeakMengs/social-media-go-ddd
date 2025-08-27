@@ -3,6 +3,7 @@ package http
 import (
 	"social-media-go-ddd/internal/application/service"
 	"social-media-go-ddd/internal/domain/dto"
+	"social-media-go-ddd/internal/domain/entity"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -60,9 +61,7 @@ func (h *PostHandler) RegisterRoutes(app *fiber.App) {
 	apiPostsProtected.Post("/:id/favorite", h.FavoritePost)
 	apiPostsProtected.Delete("/:id/favorite", h.UnfavoritePost)
 	apiPostsProtected.Post("/:id/repost", h.RepostPost)
-
-	apiRepostsProtected := app.Group("/api/v1/reposts", h.middleware.auth.Handler)
-	apiRepostsProtected.Delete("/:id", h.UnrepostPost)
+	apiPostsProtected.Delete("/:id/repost", h.UnrepostPost)
 }
 
 func (p *PostHandler) getCurrentUserId(ctx *fiber.Ctx) *string {
@@ -323,19 +322,20 @@ func (h *PostHandler) RepostPost(ctx *fiber.Ctx) error {
 }
 
 func (h *PostHandler) UnrepostPost(ctx *fiber.Ctx) error {
-	_, err := GetUserFromCtx(ctx)
+	user, err := GetUserFromCtx(ctx)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
 	}
 
-	id := ctx.Params("id")
-	repost, err := h.service.repost.GetByID(ctx.Context(), id)
+	postID := ctx.Params("id")
+	postIDUUID, err := entity.StringToUUID(postID)
 	if err != nil {
-		return ErrorResponse(ctx, fiber.StatusNotFound, err)
+		return ErrorResponse(ctx, fiber.StatusBadRequest, err)
 	}
 
 	err = h.service.repost.Delete(ctx.Context(), dto.DeleteRepost{
-		ID: repost.ID.String(),
+		UserID: user.ID,
+		PostID: postIDUUID,
 	})
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)

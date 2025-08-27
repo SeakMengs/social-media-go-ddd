@@ -44,6 +44,15 @@ func (r *PgPostRepository) getFavoritedStatus(ctx context.Context, postID string
 	return favorited, nil
 }
 
+func (r *PgPostRepository) getRepostedStatus(ctx context.Context, postID string, userID string) (bool, error) {
+	var reposted bool
+	err := r.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM reposts WHERE post_id=$1 AND user_id=$2)", postID, userID).Scan(&reposted)
+	if err != nil {
+		return false, err
+	}
+	return reposted, nil
+}
+
 func (r *PgPostRepository) FindByID(ctx context.Context, id string, currentUserID *string) (*aggregate.Post, error) {
 	query := `SELECT posts.id, 
        posts.user_id, 
@@ -81,7 +90,7 @@ func (r *PgPostRepository) FindByID(ctx context.Context, id string, currentUserI
 	var post Post
 	var likeCount, favoriteCount, repostCount int
 	var user User
-	var liked, favorited bool
+	var liked, favorited, reposted bool
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&post.ID,
 		&post.UserID,
@@ -109,6 +118,11 @@ func (r *PgPostRepository) FindByID(ctx context.Context, id string, currentUserI
 		if err != nil {
 			return nil, err
 		}
+
+		reposted, err = r.getRepostedStatus(ctx, id, *currentUserID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	ePost, err := post.ToEntity()
@@ -127,6 +141,7 @@ func (r *PgPostRepository) FindByID(ctx context.Context, id string, currentUserI
 		RepostCount:   repostCount,
 		Liked:         liked,
 		Favorited:     favorited,
+		Reposted:      reposted,
 	}), nil
 }
 
@@ -198,6 +213,11 @@ func (r *PgPostRepository) FindByUserID(ctx context.Context, userID string) ([]*
 			return nil, err
 		}
 
+		reposted, err := r.getRepostedStatus(ctx, post.ID.String(), userID)
+		if err != nil {
+			return nil, err
+		}
+
 		ePost, err := post.ToEntity()
 		if err != nil {
 			return nil, err
@@ -209,6 +229,7 @@ func (r *PgPostRepository) FindByUserID(ctx context.Context, userID string) ([]*
 			RepostCount:   repostCount,
 			Liked:         liked,
 			Favorited:     favorited,
+			Reposted:      reposted,
 		}))
 	}
 
@@ -330,6 +351,7 @@ func (r *PgPostRepository) FindFeed(ctx context.Context, userID string, limit, o
 	for rows.Next() {
 		var post Post
 		var likeCount, favoriteCount, repostCount int
+		var liked, favorited, reposted bool
 		var feedTime time.Time
 		var postUser User
 
@@ -365,10 +387,28 @@ func (r *PgPostRepository) FindFeed(ctx context.Context, userID string, limit, o
 			return nil, 0, err
 		}
 
+		liked, err = r.getLikedStatus(ctx, post.ID.String(), userID)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		favorited, err = r.getFavoritedStatus(ctx, post.ID.String(), userID)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		reposted, err = r.getRepostedStatus(ctx, post.ID.String(), userID)
+		if err != nil {
+			return nil, 0, err
+		}
+
 		commonAggregate := dto.CommonPostAggregate{
 			LikeCount:     likeCount,
 			FavoriteCount: favoriteCount,
 			RepostCount:   repostCount,
+			Liked:         liked,
+			Favorited:     favorited,
+			Reposted:      reposted,
 		}
 
 		ePostUser, err := postUser.ToEntity()

@@ -18,6 +18,33 @@ func NewMySQLRepostRepository(db *sql.DB) *MySQLRepostRepository {
 	}
 }
 
+func (r *MySQLRepostRepository) getLikedStatus(ctx context.Context, postID string, userID string) (bool, error) {
+	var liked bool
+	err := r.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM likes WHERE post_id=? AND user_id=?)", postID, userID).Scan(&liked)
+	if err != nil {
+		return false, err
+	}
+	return liked, nil
+}
+
+func (r *MySQLRepostRepository) getFavoritedStatus(ctx context.Context, postID string, userID string) (bool, error) {
+	var favorited bool
+	err := r.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM favorites WHERE post_id=? AND user_id=?)", postID, userID).Scan(&favorited)
+	if err != nil {
+		return false, err
+	}
+	return favorited, nil
+}
+
+func (r *MySQLRepostRepository) getRepostedStatus(ctx context.Context, postID string, userID string) (bool, error) {
+	var reposted bool
+	err := r.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM reposts WHERE post_id=? AND user_id=?)", postID, userID).Scan(&reposted)
+	if err != nil {
+		return false, err
+	}
+	return reposted, nil
+}
+
 func (r *MySQLRepostRepository) FindByID(ctx context.Context, id string) (*entity.Repost, error) {
 	query := `SELECT id, user_id, post_id, comment, created_at, updated_at FROM reposts WHERE id = ?`
 
@@ -32,15 +59,45 @@ func (r *MySQLRepostRepository) FindByID(ctx context.Context, id string) (*entit
 	return rp.ToEntity()
 }
 
+// One user can only repost one, if already exist, update comment
 func (r *MySQLRepostRepository) Save(ctx context.Context, rp *entity.Repost) error {
-	query := `INSERT INTO reposts (id, user_id, post_id, comment) VALUES (?, ?, ?, ?)`
-	_, err := r.db.ExecContext(ctx, query, rp.ID, rp.UserID, rp.PostID, rp.Comment)
-	return err
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	checkQuery := `SELECT id FROM reposts WHERE user_id = ? AND post_id = ?`
+	row := tx.QueryRowContext(ctx, checkQuery, rp.UserID, rp.PostID)
+
+	var existingID string
+	err = row.Scan(&existingID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// No existing repost found, insert new repost
+			insertQuery := `INSERT INTO reposts (id, user_id, post_id, comment) VALUES (?, ?, ?, ?)`
+			_, err := tx.ExecContext(ctx, insertQuery, rp.ID, rp.UserID, rp.PostID, rp.Comment)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	} else {
+		// Existing repost found, update comment
+		updateQuery := `UPDATE reposts SET comment = ? WHERE id = ?`
+		_, err := tx.ExecContext(ctx, updateQuery, rp.Comment, existingID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
-func (r *MySQLRepostRepository) Delete(ctx context.Context, id string) error {
-	query := `DELETE FROM reposts WHERE id = ?`
-	_, err := r.db.ExecContext(ctx, query, id)
+func (r *MySQLRepostRepository) Delete(ctx context.Context, userID string, postID string) error {
+	query := `DELETE FROM reposts WHERE user_id = ? AND post_id = ?`
+	_, err := r.db.ExecContext(ctx, query, userID, postID)
 	return err
 }
 
@@ -84,6 +141,7 @@ func (r *MySQLRepostRepository) FindByUserID(ctx context.Context, userID string)
 	for rows.Next() {
 		var post Post
 		var likeCount, favoriteCount, repostCount int
+		var liked, favorited, reposted bool
 		var repost Repost
 		var user User
 
@@ -124,10 +182,28 @@ func (r *MySQLRepostRepository) FindByUserID(ctx context.Context, userID string)
 			return nil, err
 		}
 
+		liked, err = r.getLikedStatus(ctx, post.ID, userID)
+		if err != nil {
+			return nil, err
+		}
+
+		favorited, err = r.getFavoritedStatus(ctx, post.ID, userID)
+		if err != nil {
+			return nil, err
+		}
+
+		reposted, err = r.getRepostedStatus(ctx, post.ID, userID)
+		if err != nil {
+			return nil, err
+		}
+
 		reposts = append(reposts, aggregate.NewRepost(*ePost, eRepost, *eUser, eRepostUser, dto.CommonPostAggregate{
 			LikeCount:     likeCount,
 			FavoriteCount: favoriteCount,
 			RepostCount:   repostCount,
+			Liked:         liked,
+			Favorited:     favorited,
+			Reposted:      reposted,
 		}))
 	}
 

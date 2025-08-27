@@ -20,6 +20,7 @@ type Post struct {
 	User          entity.User `json:"user"`
 	Liked         bool        `json:"liked"`
 	Favorited     bool        `json:"favorited"`
+	Reposted      bool        `json:"reposted"`
 	LikeCount     int         `json:"likeCount"`
 	RepostCount   int         `json:"repostCount"`
 	FavoriteCount int         `json:"favoriteCount"`
@@ -35,6 +36,7 @@ func NewPost(post entity.Post, user entity.User, cpa dto.CommonPostAggregate) *P
 		User:          user,
 		Liked:         cpa.Liked,
 		Favorited:     cpa.Favorited,
+		Reposted:      cpa.Reposted,
 		LikeCount:     cpa.LikeCount,
 		RepostCount:   cpa.RepostCount,
 		FavoriteCount: cpa.FavoriteCount,
@@ -50,6 +52,7 @@ func NewRepost(post entity.Post, repost *entity.Repost, user entity.User, repost
 		User:          user,
 		Liked:         cpa.Liked,
 		Favorited:     cpa.Favorited,
+		Reposted:      cpa.Reposted,
 		LikeCount:     cpa.LikeCount,
 		RepostCount:   cpa.RepostCount,
 		FavoriteCount: cpa.FavoriteCount,

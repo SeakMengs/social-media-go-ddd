@@ -22,6 +22,7 @@ type (
 	CommonPostAggregate struct {
 		Liked         bool `json:"liked"`
 		Favorited     bool `json:"favorited"`
+		Reposted      bool `json:"reposted"`
 		LikeCount     int  `json:"like_count"`
 		RepostCount   int  `json:"repost_count"`
 		FavoriteCount int  `json:"favorite_count"`

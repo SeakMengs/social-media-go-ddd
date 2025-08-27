@@ -1,17 +1,13 @@
 meta {
   name: Unrepost post by id
   type: http
-  seq: 10
+  seq: 8
 }
 
 delete {
-  url: {{url}}/api/v1/reposts/078c9cc0-07f7-4704-8932-308493978cb9
+  url: {{url}}/api/v1/posts/663947b5-bba0-4e33-8855-66c10fea8288/repost
   body: multipartForm
   auth: inherit
-}
-
-body:multipart-form {
-  comment: nice
 }
 
 settings {

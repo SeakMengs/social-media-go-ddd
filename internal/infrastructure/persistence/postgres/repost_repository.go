@@ -20,6 +20,33 @@ func NewPgRepostRepository(pool *pgxpool.Pool) *PgRepostRepository {
 	}
 }
 
+func (r *PgRepostRepository) getLikedStatus(ctx context.Context, postID string, userID string) (bool, error) {
+	var liked bool
+	err := r.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM likes WHERE post_id=$1 AND user_id=$2)", postID, userID).Scan(&liked)
+	if err != nil {
+		return false, err
+	}
+	return liked, nil
+}
+
+func (r *PgRepostRepository) getFavoritedStatus(ctx context.Context, postID string, userID string) (bool, error) {
+	var favorited bool
+	err := r.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM favorites WHERE post_id=$1 AND user_id=$2)", postID, userID).Scan(&favorited)
+	if err != nil {
+		return false, err
+	}
+	return favorited, nil
+}
+
+func (r *PgRepostRepository) getRepostedStatus(ctx context.Context, postID string, userID string) (bool, error) {
+	var reposted bool
+	err := r.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM reposts WHERE post_id=$1 AND user_id=$2)", postID, userID).Scan(&reposted)
+	if err != nil {
+		return false, err
+	}
+	return reposted, nil
+}
+
 func (r *PgRepostRepository) FindByID(ctx context.Context, id string) (*entity.Repost, error) {
 	query := `SELECT id, user_id, post_id, comment, created_at, updated_at FROM reposts WHERE id = $1`
 	rows, err := r.pool.Query(ctx, query, id)
@@ -36,18 +63,46 @@ func (r *PgRepostRepository) FindByID(ctx context.Context, id string) (*entity.R
 	return rp.ToEntity()
 }
 
+// One user can only repost one, if already exist, update comment
 func (r *PgRepostRepository) Save(ctx context.Context, rp *entity.Repost) error {
-	query := `INSERT INTO reposts (id, user_id, post_id, comment) VALUES ($1, $2, $3, $4)`
-	_, err := r.pool.Exec(ctx, query, rp.ID, rp.UserID, rp.PostID, rp.Comment)
+	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	return nil
+	defer tx.Rollback(ctx)
+
+	checkQuery := `SELECT id FROM reposts WHERE user_id = $1 AND post_id = $2`
+	row := tx.QueryRow(ctx, checkQuery, rp.UserID, rp.PostID)
+
+	var existingID string
+	if err := row.Scan(&existingID); err != nil {
+		if err == pgx.ErrNoRows {
+			// No existing repost found, insert new repost
+			insertQuery := `INSERT INTO reposts (id, user_id, post_id, comment) VALUES ($1, $2, $3, $4)`
+			_, err := tx.Exec(ctx, insertQuery, rp.ID, rp.UserID, rp.PostID, rp.Comment)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+
+	if existingID != "" {
+		// Existing repost found, update comment
+		updateQuery := `UPDATE reposts SET comment = $1 WHERE id = $2`
+		_, err := tx.Exec(ctx, updateQuery, rp.Comment, existingID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
-func (r *PgRepostRepository) Delete(ctx context.Context, id string) error {
-	query := `DELETE FROM reposts WHERE id = $1`
-	_, err := r.pool.Exec(ctx, query, id)
+func (r *PgRepostRepository) Delete(ctx context.Context, userID string, postID string) error {
+	query := `DELETE FROM reposts WHERE user_id = $1 AND post_id = $2`
+	_, err := r.pool.Exec(ctx, query, userID, postID)
 	return err
 }
 
@@ -91,6 +146,7 @@ func (r *PgRepostRepository) FindByUserID(ctx context.Context, userID string) ([
 	for rows.Next() {
 		var post Post
 		var likeCount, favoriteCount, repostCount int
+		var liked, favorited, reposted bool
 		var repost Repost
 		var user User
 
@@ -131,10 +187,28 @@ func (r *PgRepostRepository) FindByUserID(ctx context.Context, userID string) ([
 			return nil, err
 		}
 
+		liked, err = r.getLikedStatus(ctx, post.ID.String(), userID)
+		if err != nil {
+			return nil, err
+		}
+
+		favorited, err = r.getFavoritedStatus(ctx, post.ID.String(), userID)
+		if err != nil {
+			return nil, err
+		}
+
+		reposted, err = r.getRepostedStatus(ctx, post.ID.String(), userID)
+		if err != nil {
+			return nil, err
+		}
+
 		reposts = append(reposts, aggregate.NewRepost(*ePost, eRepost, *eUser, eRepostUser, dto.CommonPostAggregate{
 			LikeCount:     likeCount,
 			FavoriteCount: favoriteCount,
 			RepostCount:   repostCount,
+			Liked:         liked,
+			Favorited:     favorited,
+			Reposted:      reposted,
 		}))
 	}
 

@@ -45,6 +45,15 @@ func (r *MySQLPostRepository) getFavoritedStatus(ctx context.Context, postID str
 	return favorited, nil
 }
 
+func (r *MySQLPostRepository) getRepostedStatus(ctx context.Context, postID string, userID string) (bool, error) {
+	var reposted bool
+	err := r.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM reposts WHERE post_id=? AND user_id=?)", postID, userID).Scan(&reposted)
+	if err != nil {
+		return false, err
+	}
+	return reposted, nil
+}
+
 func (r *MySQLPostRepository) FindByID(ctx context.Context, id string, currentUserID *string) (*aggregate.Post, error) {
 	query := `SELECT posts.id, posts.user_id, posts.content, posts.created_at, posts.updated_at,
 		COALESCE(likes_count.count, 0) AS like_count,
@@ -69,7 +78,7 @@ func (r *MySQLPostRepository) FindByID(ctx context.Context, id string, currentUs
 	var user entity.User
 	var post entity.Post
 	var likeCount, favoriteCount, repostCount int
-	var liked, favorited bool
+	var liked, favorited, reposted bool
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&post.ID,
 		&post.UserID,
@@ -97,6 +106,11 @@ func (r *MySQLPostRepository) FindByID(ctx context.Context, id string, currentUs
 		if err != nil {
 			return nil, err
 		}
+
+		reposted, err = r.getRepostedStatus(ctx, id, *currentUserID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return aggregate.NewPost(post, user, dto.CommonPostAggregate{
@@ -105,6 +119,7 @@ func (r *MySQLPostRepository) FindByID(ctx context.Context, id string, currentUs
 		RepostCount:   repostCount,
 		Liked:         liked,
 		Favorited:     favorited,
+		Reposted:      reposted,
 	}), nil
 }
 
@@ -166,12 +181,18 @@ func (r *MySQLPostRepository) FindByUserID(ctx context.Context, userID string) (
 			return nil, err
 		}
 
+		reposted, err := r.getRepostedStatus(ctx, post.ID.String(), userID)
+		if err != nil {
+			return nil, err
+		}
+
 		posts = append(posts, aggregate.NewPost(post, user, dto.CommonPostAggregate{
 			LikeCount:     likeCount,
 			FavoriteCount: favoriteCount,
 			RepostCount:   repostCount,
 			Liked:         liked,
 			Favorited:     favorited,
+			Reposted:      reposted,
 		}))
 	}
 

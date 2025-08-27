@@ -34,6 +34,7 @@ func (s *RepostService) Create(ctx context.Context, nf dto.NewRepost) (*entity.R
 	// Invalidate post cache since repost count changed
 	s.cache.Delete(ctx, s.cacheKeys.Post(repost.PostID.String()))
 	// Invalidate user reposts cache
+	s.cache.Delete(ctx, s.cacheKeys.UserPosts(repost.UserID.String()))
 	s.cache.Delete(ctx, s.cacheKeys.UserReposts(repost.UserID.String()))
 	s.cache.DeleteByPattern(ctx, s.cacheKeys.UserFeedPattern(repost.UserID.String()))
 
@@ -41,17 +42,15 @@ func (s *RepostService) Create(ctx context.Context, nf dto.NewRepost) (*entity.R
 }
 
 func (s *RepostService) Delete(ctx context.Context, dl dto.DeleteRepost) error {
-	// Get the repost first to get the user ID and post ID for cache invalidation
-	repost, err := s.repository.FindByID(ctx, dl.ID)
-	if err == nil && repost != nil {
-		// Invalidate post cache since repost count changed
-		s.cache.Delete(ctx, s.cacheKeys.Post(repost.PostID.String()))
-		s.cache.Delete(ctx, s.cacheKeys.UserReposts(repost.UserID.String()))
-		s.cache.DeleteByPattern(ctx, s.cacheKeys.UserFeedPattern(repost.UserID.String()))
-	}
-
-	return s.repository.Delete(ctx, dl.ID)
+	// Invalidate post cache since repost count changed
+	s.cache.Delete(ctx, s.cacheKeys.Post(dl.PostID.String()))
+	// Invalidate user reposts cache
+	s.cache.Delete(ctx, s.cacheKeys.UserPosts(dl.UserID.String()))
+	s.cache.Delete(ctx, s.cacheKeys.UserReposts(dl.UserID.String()))
+	s.cache.DeleteByPattern(ctx, s.cacheKeys.UserFeedPattern(dl.UserID.String()))
+	return s.repository.Delete(ctx, dl.UserID.String(), dl.PostID.String())
 }
+
 func (s *RepostService) GetByID(ctx context.Context, id string) (*entity.Repost, error) {
 	cacheKey := s.cacheKeys.Repost(id)
 	val, err := s.cache.Get(ctx, cacheKey)
