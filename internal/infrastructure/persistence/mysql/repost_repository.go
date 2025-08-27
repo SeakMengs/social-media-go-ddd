@@ -45,13 +45,22 @@ func (r *MySQLRepostRepository) Delete(ctx context.Context, id string) error {
 }
 
 func (r *MySQLRepostRepository) FindByUserID(ctx context.Context, userID string) ([]*aggregate.Post, error) {
+	var repostUser entity.User
+	err := r.db.QueryRowContext(ctx, "SELECT id, username, email FROM users WHERE id=?", userID).
+		Scan(&repostUser.ID, &repostUser.Username, &repostUser.Email)
+	if err != nil {
+		return nil, err
+	}
+
 	query := `
 		SELECT p.id, p.user_id, p.content, p.created_at, p.updated_at,
 			COALESCE(likes_count.count, 0) AS like_count,
 			COALESCE(favorites_count.count, 0) AS favorite_count,
 			COALESCE(reposts_count.count, 0) AS repost_count,
-			reposts.id, reposts.user_id, reposts.post_id, reposts.comment, reposts.created_at, reposts.updated_at
+			reposts.id, reposts.user_id, reposts.post_id, reposts.comment, reposts.created_at, reposts.updated_at,
+			users.id, users.username, users.email
 		FROM reposts
+		INNER JOIN users ON reposts.user_id = users.id
 		INNER JOIN posts p ON reposts.post_id = p.id
 		LEFT JOIN (SELECT post_id, COUNT(*) AS count FROM likes GROUP BY post_id) likes_count ON likes_count.post_id = p.id
 		LEFT JOIN (SELECT post_id, COUNT(*) AS count FROM favorites GROUP BY post_id) favorites_count ON favorites_count.post_id = p.id
@@ -71,6 +80,7 @@ func (r *MySQLRepostRepository) FindByUserID(ctx context.Context, userID string)
 		var post entity.Post
 		var likeCount, favoriteCount, repostCount int
 		var repost entity.Repost
+		var user entity.User
 
 		if err := rows.Scan(
 			&post.ID,
@@ -87,11 +97,14 @@ func (r *MySQLRepostRepository) FindByUserID(ctx context.Context, userID string)
 			&repost.Comment,
 			&repost.CreatedAt,
 			&repost.UpdatedAt,
+			&user.ID,
+			&user.Username,
+			&user.Email,
 		); err != nil {
 			return nil, err
 		}
 
-		reposts = append(reposts, aggregate.NewRepost(post, &repost, dto.CommonPostAggregate{
+		reposts = append(reposts, aggregate.NewRepost(post, &repost, user, &repostUser, dto.CommonPostAggregate{
 			LikeCount:     likeCount,
 			FavoriteCount: favoriteCount,
 			RepostCount:   repostCount,

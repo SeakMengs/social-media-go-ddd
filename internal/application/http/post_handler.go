@@ -96,7 +96,7 @@ func (h *PostHandler) DeletePost(ctx *fiber.Ctx) error {
 	}
 	id := ctx.Params("id")
 
-	post, err := h.service.post.GetByID(ctx.Context(), id)
+	post, err := h.service.post.GetByID(ctx.Context(), id, user.ID.String())
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
@@ -124,7 +124,7 @@ func (h *PostHandler) UpdatePost(ctx *fiber.Ctx) error {
 	body.UserID = user.ID
 	body.ID = id
 
-	post, err := h.service.post.GetByID(ctx.Context(), id)
+	post, err := h.service.post.GetByID(ctx.Context(), id, user.ID.String())
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
@@ -144,7 +144,7 @@ func (h *PostHandler) UpdatePost(ctx *fiber.Ctx) error {
 
 func (h *PostHandler) GetPostByID(ctx *fiber.Ctx) error {
 	id := ctx.Params("id")
-	post, err := h.service.post.GetByID(ctx.Context(), id)
+	post, err := h.service.post.GetByID(ctx.Context(), id, "")
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
@@ -161,17 +161,19 @@ func (h *PostHandler) LikePost(ctx *fiber.Ctx) error {
 	}
 
 	id := ctx.Params("id")
-	post, err := h.service.post.GetByID(ctx.Context(), id)
+	post, err := h.service.post.GetByID(ctx.Context(), id, user.ID.String())
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
 
-	_, err = h.service.like.Create(ctx.Context(), dto.NewLike{
-		UserID: user.ID,
-		PostID: post.ID,
-	})
-	if err != nil {
-		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	if !post.Liked {
+		_, err = h.service.like.Create(ctx.Context(), dto.NewLike{
+			UserID: user.ID,
+			PostID: post.ID,
+		})
+		if err != nil {
+			return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+		}
 	}
 
 	return SuccessResponse(ctx, nil)
@@ -184,17 +186,19 @@ func (h *PostHandler) UnlikePost(ctx *fiber.Ctx) error {
 	}
 
 	id := ctx.Params("id")
-	post, err := h.service.post.GetByID(ctx.Context(), id)
+	post, err := h.service.post.GetByID(ctx.Context(), id, user.ID.String())
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
 
-	err = h.service.like.Delete(ctx.Context(), dto.DeleteLike{
-		UserID: user.ID,
-		PostID: post.ID,
-	})
-	if err != nil {
-		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	if post.Liked {
+		err = h.service.like.Delete(ctx.Context(), dto.DeleteLike{
+			UserID: user.ID,
+			PostID: post.ID,
+		})
+		if err != nil {
+			return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+		}
 	}
 
 	return SuccessResponse(ctx, nil)
@@ -207,17 +211,19 @@ func (h *PostHandler) FavoritePost(ctx *fiber.Ctx) error {
 	}
 
 	id := ctx.Params("id")
-	post, err := h.service.post.GetByID(ctx.Context(), id)
+	post, err := h.service.post.GetByID(ctx.Context(), id, user.ID.String())
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
 
-	_, err = h.service.favorite.Create(ctx.Context(), dto.NewFavorite{
-		UserID: user.ID,
-		PostID: post.ID,
-	})
-	if err != nil {
-		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	if !post.Favorited {
+		_, err = h.service.favorite.Create(ctx.Context(), dto.NewFavorite{
+			UserID: user.ID,
+			PostID: post.ID,
+		})
+		if err != nil {
+			return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+		}
 	}
 
 	return SuccessResponse(ctx, nil)
@@ -230,17 +236,19 @@ func (h *PostHandler) UnfavoritePost(ctx *fiber.Ctx) error {
 	}
 
 	id := ctx.Params("id")
-	post, err := h.service.post.GetByID(ctx.Context(), id)
+	post, err := h.service.post.GetByID(ctx.Context(), id, user.ID.String())
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
 
-	err = h.service.favorite.Delete(ctx.Context(), dto.DeleteFavorite{
-		UserID: user.ID,
-		PostID: post.ID,
-	})
-	if err != nil {
-		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	if post.Favorited {
+		err = h.service.favorite.Delete(ctx.Context(), dto.DeleteFavorite{
+			UserID: user.ID,
+			PostID: post.ID,
+		})
+		if err != nil {
+			return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+		}
 	}
 
 	return SuccessResponse(ctx, nil)
@@ -262,7 +270,7 @@ func (h *PostHandler) RepostPost(ctx *fiber.Ctx) error {
 		return ErrorResponse(ctx, fiber.StatusBadRequest, err)
 	}
 
-	post, err := h.service.post.GetByID(ctx.Context(), id)
+	post, err := h.service.post.GetByID(ctx.Context(), id, user.ID.String())
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}

@@ -312,7 +312,7 @@ func (h *UserHandler) GetMyFeed(ctx *fiber.Ctx) error {
 	p, pSize := getPaginationParams(ctx)
 	limit, offset := paginationToLimitOffset(p, pSize)
 
-	feed, total, err := h.service.user.GetFeed(ctx.Context(), user.ID.String(), limit, offset)
+	feed, total, err := h.service.post.GetFeed(ctx.Context(), user.ID.String(), limit, offset)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
 	}

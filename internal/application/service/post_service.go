@@ -8,6 +8,7 @@ import (
 	"social-media-go-ddd/internal/domain/entity"
 	"social-media-go-ddd/internal/domain/repository"
 	"social-media-go-ddd/internal/infrastructure/cache"
+	"time"
 )
 
 type PostService struct {
@@ -37,7 +38,7 @@ func (s *PostService) Create(ctx context.Context, np dto.NewPost) (*entity.Post,
 	return post, nil
 }
 
-func (s *PostService) GetByID(ctx context.Context, id string) (*aggregate.Post, error) {
+func (s *PostService) GetByID(ctx context.Context, id string, currentUserID string) (*aggregate.Post, error) {
 	cacheKey := s.cacheKeys.Post(id)
 	val, err := s.cache.Get(ctx, cacheKey)
 	if !cache.IsCacheError(err) {
@@ -47,7 +48,7 @@ func (s *PostService) GetByID(ctx context.Context, id string) (*aggregate.Post, 
 		}
 	}
 
-	post, err := s.repository.FindByID(ctx, id)
+	post, err := s.repository.FindByID(ctx, id, currentUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -104,4 +105,40 @@ func (s *PostService) Update(ctx context.Context, old *entity.Post, up dto.Updat
 	s.cache.Delete(ctx, s.cacheKeys.UserPosts(post.UserID.String()))
 	s.cache.DeleteByPattern(ctx, s.cacheKeys.UserFeedPattern(post.UserID.String()))
 	return post, nil
+}
+
+// return posts, total, error
+func (s *PostService) GetFeed(ctx context.Context, userID string, limit, offset int) ([]*aggregate.Post, int, error) {
+	cacheKey := s.cacheKeys.UserFeed(userID, limit, offset)
+
+	val, err := s.cache.Get(ctx, cacheKey)
+	if !cache.IsCacheError(err) {
+		var feedData struct {
+			Posts []*aggregate.Post `json:"posts"`
+			Total int               `json:"total"`
+		}
+		if json.Unmarshal([]byte(val), &feedData) == nil {
+			return feedData.Posts, feedData.Total, nil
+		}
+	}
+
+	posts, total, err := s.repository.FindFeed(ctx, userID, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Save to cache with shorter TTL since feeds are dynamic
+	feedData := struct {
+		Posts []*aggregate.Post `json:"posts"`
+		Total int               `json:"total"`
+	}{
+		Posts: posts,
+		Total: total,
+	}
+	data, err := json.Marshal(feedData)
+	if err == nil {
+		s.cache.Set(ctx, cacheKey, data, 1*time.Minute)
+	}
+
+	return posts, total, nil
 }
