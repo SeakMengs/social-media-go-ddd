@@ -2,19 +2,20 @@ package http
 
 import (
 	"errors"
+	"social-media-go-ddd/internal/domain/aggregate"
 	"social-media-go-ddd/internal/domain/entity"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 // User context set by auth middleware handler
-func GetUserFromCtx(c *fiber.Ctx) (*entity.User, error) {
+func GetUserFromCtx(c *fiber.Ctx) (*aggregate.User, error) {
 	user := c.Locals("user")
 	if user == nil {
 		return nil, errors.New("user not found in context")
 	}
 
-	u, ok := user.(*entity.User)
+	u, ok := user.(*aggregate.User)
 	if !ok {
 		return nil, errors.New("user in context has wrong type")
 	}

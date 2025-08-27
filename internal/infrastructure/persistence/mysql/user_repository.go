@@ -3,6 +3,8 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	"social-media-go-ddd/internal/domain/aggregate"
+	"social-media-go-ddd/internal/domain/dto"
 	"social-media-go-ddd/internal/domain/entity"
 )
 
@@ -20,30 +22,82 @@ func (r *MySQLUserRepository) Save(ctx context.Context, u *entity.User) error {
 	return err
 }
 
-func (r *MySQLUserRepository) FindByID(ctx context.Context, id string) (*entity.User, error) {
-	query := `SELECT id, username, email, password, created_at, updated_at FROM users WHERE id = ?`
+func (r *MySQLUserRepository) FindByID(ctx context.Context, id string, currentUserID string) (*aggregate.User, error) {
+	query := `
+		SELECT 
+			users.id,
+			users.username,
+			users.email,
+			users.password,
+			users.created_at,
+			users.updated_at,
+			EXISTS (
+				SELECT 1 FROM follows WHERE follows.follower_id = ? AND follows.followee_id = users.id
+			) AS followed,
+			(SELECT COUNT(*) FROM follows WHERE follower_id = users.id) AS following_count,
+			(SELECT COUNT(*) FROM follows WHERE followee_id = users.id) AS follower_count
+		FROM users
+		WHERE users.id = ?
+	`
 
-	row := r.db.QueryRowContext(ctx, query, id)
+	row := r.db.QueryRowContext(ctx, query, currentUserID, id)
 
 	var u User
-	err := row.Scan(&u.ID, &u.Username, &u.Email, &u.Password, &u.CreatedAt, &u.UpdatedAt)
+	var followed bool
+	var followingCount, followerCount int
+	err := row.Scan(&u.ID, &u.Username, &u.Email, &u.Password, &u.CreatedAt, &u.UpdatedAt, &followed, &followingCount, &followerCount)
 	if err != nil {
 		return nil, err
 	}
 
-	return u.ToEntity()
+	userEntity, err := u.ToEntity()
+	if err != nil {
+		return nil, err
+	}
+
+	return aggregate.NewUser(*userEntity, dto.CommonUserAggregate{
+		Followed:       followed,
+		FollowingCount: followingCount,
+		FollowerCount:  followerCount,
+	}), nil
 }
 
-func (r *MySQLUserRepository) FindByName(ctx context.Context, username string) (*entity.User, error) {
-	query := `SELECT id, username, email, password, created_at, updated_at FROM users WHERE username = ?`
+func (r *MySQLUserRepository) FindByName(ctx context.Context, username string, currentUserID string) (*aggregate.User, error) {
+	query := `
+		SELECT 
+			users.id,
+			users.username,
+			users.email,
+			users.password,
+			users.created_at,
+			users.updated_at,
+			EXISTS (
+				SELECT 1 FROM follows WHERE follows.follower_id = ? AND follows.followee_id = users.id
+			) AS followed,
+			(SELECT COUNT(*) FROM follows WHERE follower_id = users.id) AS following_count,
+			(SELECT COUNT(*) FROM follows WHERE followee_id = users.id) AS follower_count
+		FROM users
+		WHERE users.username = ?
+	`
 
-	row := r.db.QueryRowContext(ctx, query, username)
+	row := r.db.QueryRowContext(ctx, query, currentUserID, username)
 
 	var u User
-	err := row.Scan(&u.ID, &u.Username, &u.Email, &u.Password, &u.CreatedAt, &u.UpdatedAt)
+	var followed bool
+	var followingCount, followerCount int
+	err := row.Scan(&u.ID, &u.Username, &u.Email, &u.Password, &u.CreatedAt, &u.UpdatedAt, &followed, &followingCount, &followerCount)
 	if err != nil {
 		return nil, err
 	}
 
-	return u.ToEntity()
+	userEntity, err := u.ToEntity()
+	if err != nil {
+		return nil, err
+	}
+
+	return aggregate.NewUser(*userEntity, dto.CommonUserAggregate{
+		Followed:       followed,
+		FollowingCount: followingCount,
+		FollowerCount:  followerCount,
+	}), nil
 }

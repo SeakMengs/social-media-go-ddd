@@ -93,8 +93,20 @@ func (h *UserHandler) CreateUser(ctx *fiber.Ctx) error {
 }
 
 func (h *UserHandler) GetUserByID(ctx *fiber.Ctx) error {
+	var currentUserID string
+
+	// Try to read bearer token and get session/user, but it's optional
+	// Such that when getting the user, we know if we have followed that person or not yet
+	token, err := readBearerToken(ctx)
+	if err == nil && token != "" {
+		session, err := h.service.session.GetByID(ctx.Context(), token)
+		if err == nil && !session.IsExpired() {
+			currentUserID = session.UserID.String()
+		}
+	}
+
 	id := ctx.Params("id")
-	user, err := h.service.user.GetByID(ctx.Context(), id)
+	user, err := h.service.user.GetByID(ctx.Context(), id, currentUserID)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
@@ -154,7 +166,7 @@ func (h *UserHandler) Login(ctx *fiber.Ctx) error {
 		return ErrorResponse(ctx, fiber.StatusBadRequest, err)
 	}
 
-	user, err := h.service.user.GetByName(ctx.Context(), body.Username)
+	user, err := h.service.user.GetByName(ctx.Context(), body.Username, "")
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
@@ -260,7 +272,7 @@ func (h *UserHandler) FollowUser(ctx *fiber.Ctx) error {
 	}
 
 	targetID := ctx.Params("id")
-	targetUser, err := h.service.user.GetByID(ctx.Context(), targetID)
+	targetUser, err := h.service.user.GetByID(ctx.Context(), targetID, user.ID.String())
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
@@ -287,7 +299,7 @@ func (h *UserHandler) UnfollowUser(ctx *fiber.Ctx) error {
 	}
 
 	targetID := ctx.Params("id")
-	targetUser, err := h.service.user.GetByID(ctx.Context(), targetID)
+	targetUser, err := h.service.user.GetByID(ctx.Context(), targetID, user.ID.String())
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}

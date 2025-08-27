@@ -31,10 +31,18 @@ func (s *FollowService) Create(ctx context.Context, nf dto.NewFollow) (*entity.F
 
 	// Since we follow someone, our feed might change, so we invalidate the cache
 	s.cache.DeleteByPattern(ctx, s.cacheKeys.UserFeedPattern(follow.FollowerID.String()))
+
+	// update the cache of both users involved in the follow relationship
+	s.cache.Delete(ctx, s.cacheKeys.User(follow.FollowerID.String()))
+	s.cache.Delete(ctx, s.cacheKeys.User(follow.FolloweeID.String()))
 	return follow, nil
 }
 
 func (s *FollowService) Delete(ctx context.Context, dl dto.DeleteFollow) error {
 	s.cache.DeleteByPattern(ctx, s.cacheKeys.UserFeedPattern(dl.FollowerID.String()))
+
+	// update the cache of both users involved in the follow relationship
+	s.cache.Delete(ctx, s.cacheKeys.User(dl.FolloweeID.String()))
+	s.cache.Delete(ctx, s.cacheKeys.User(dl.FollowerID.String()))
 	return s.repository.Delete(ctx, dl.FollowerID.String(), dl.FolloweeID.String())
 }

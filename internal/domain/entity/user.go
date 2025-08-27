@@ -14,28 +14,33 @@ type User struct {
 	Password valueobject.Password `json:"-"`
 }
 
-// MarshalJSON includes the password field.
-func (u *User) MarshalJson() ([]byte, error) {
-	return json.Marshal(struct {
-		User
+func (u *User) MarshalJSON() ([]byte, error) {
+	// use alias to avoid infinite recursion because when marshal User, it will call MarshalJSON again which causes infinite recursion
+	type Alias User
+	return json.Marshal(&struct {
+		*Alias
 		Password string `json:"password"`
 	}{
-		User:     *u,
+		Alias:    (*Alias)(u),
 		Password: u.Password.GetHash(),
 	})
 }
 
-// UnmarshalJSON includes the password field.
-func UserUnmarshalJson(data []byte) (*User, error) {
-	u := struct {
-		User
+func (u *User) UnmarshalJSON(data []byte) error {
+	type Alias User
+	usr := &struct {
+		*Alias
 		Password string `json:"password"`
-	}{}
-	if err := json.Unmarshal(data, &u); err != nil {
-		return nil, err
+	}{
+		Alias: (*Alias)(u),
 	}
-	u.User.Password = valueobject.PasswordFromHash(u.Password)
-	return &u.User, nil
+
+	if err := json.Unmarshal(data, &usr); err != nil {
+		return err
+	}
+
+	u.Password = valueobject.PasswordFromHash(usr.Password)
+	return nil
 }
 
 func NewUser(nu dto.NewUser) (*User, error) {

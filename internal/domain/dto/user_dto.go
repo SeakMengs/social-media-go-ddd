@@ -11,4 +11,10 @@ type (
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
+
+	CommonUserAggregate struct {
+		Followed       bool `json:"followed"`
+		FollowerCount  int  `json:"follower_count"`
+		FollowingCount int  `json:"following_count"`
+	}
 )
