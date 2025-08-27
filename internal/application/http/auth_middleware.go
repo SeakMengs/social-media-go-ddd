@@ -79,7 +79,8 @@ func (a *AuthMiddleware) Handler(ctx *fiber.Ctx) error {
 		return ErrorResponse(ctx, fiber.StatusUnauthorized, errors.New("session expired"))
 	}
 
-	user, err := a.service.user.GetByID(ctx.Context(), session.UserID.String(), session.UserID.String())
+	userId := session.UserID.String()
+	user, err := a.service.user.GetByID(ctx.Context(), session.UserID.String(), &userId)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusUnauthorized, errors.New("invalid user"))
 	}

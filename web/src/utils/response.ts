@@ -5,16 +5,16 @@ export type SuccessResponse<T> = {
   code: number;
 };
 
-export type ErrorResponse<T> = {
+export type ErrorResponse = {
   message: string;
   error: string;
   success: false;
   code: number;
 };
 
-export type ResponseJson<T = any, E = {}> =
+export type ResponseJson<T = any> =
   | SuccessResponse<T>
-  | ErrorResponse<E>;
+  | ErrorResponse;
 
 export const responseSuccess = <T = any>(
   message: string,
@@ -26,7 +26,7 @@ export const responseSuccess = <T = any>(
   code: 200,
 });
 
-export const responseFailed = (message: string, error: string, code: number) => ({
+export const responseFailed = (message: string, error: string, code: number): ErrorResponse => ({
   message,
   error,
   success: false,

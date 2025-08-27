@@ -33,7 +33,7 @@ func (s *UserService) Create(ctx context.Context, nu dto.NewUser) (*entity.User,
 	return user, nil
 }
 
-func (s *UserService) GetByID(ctx context.Context, id string, currentUserID string) (*aggregate.User, error) {
+func (s *UserService) GetByID(ctx context.Context, id string, currentUserID *string) (*aggregate.User, error) {
 	cacheKey := s.cacheKeys.User(id)
 	val, err := s.cache.Get(ctx, cacheKey)
 	if !cache.IsCacheError(err) {
@@ -56,7 +56,7 @@ func (s *UserService) GetByID(ctx context.Context, id string, currentUserID stri
 	return user, nil
 }
 
-func (s *UserService) GetByName(ctx context.Context, name string, currentUserID string) (*aggregate.User, error) {
+func (s *UserService) GetByName(ctx context.Context, name string, currentUserID *string) (*aggregate.User, error) {
 	cacheKey := s.cacheKeys.UserByName(name)
 	val, err := s.cache.Get(ctx, cacheKey)
 	if !cache.IsCacheError(err) {
@@ -77,4 +77,27 @@ func (s *UserService) GetByName(ctx context.Context, name string, currentUserID 
 	}
 
 	return user, nil
+}
+
+func (s *UserService) GetManyByName(ctx context.Context, name string, currentUserID *string) ([]*aggregate.User, error) {
+	// cacheKey := s.cacheKeys.UsersByName(name)
+	// val, err := s.cache.Get(ctx, cacheKey)
+	// if !cache.IsCacheError(err) {
+	// 	var users []*aggregate.User
+	// 	if err := json.Unmarshal([]byte(val), &users); err == nil {
+	// 		return users, nil
+	// 	}
+	// }
+
+	users, err := s.repository.SearchManyByName(ctx, name, currentUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	// data, err := json.Marshal(users)
+	// if err == nil {
+	// 	s.cache.Set(ctx, cacheKey, data, cache.DefaultTTL())
+	// }
+
+	return users, nil
 }

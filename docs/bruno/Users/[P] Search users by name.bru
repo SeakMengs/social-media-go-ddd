@@ -1,0 +1,15 @@
+meta {
+  name: [P] Search users by name
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{url}}/api/v1/public/users/name/cs2
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}

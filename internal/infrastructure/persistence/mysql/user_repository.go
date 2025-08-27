@@ -22,7 +22,7 @@ func (r *MySQLUserRepository) Save(ctx context.Context, u *entity.User) error {
 	return err
 }
 
-func (r *MySQLUserRepository) FindByID(ctx context.Context, id string, currentUserID string) (*aggregate.User, error) {
+func (r *MySQLUserRepository) FindByID(ctx context.Context, id string, currentUserID *string) (*aggregate.User, error) {
 	query := `
 		SELECT 
 			users.id,
@@ -62,7 +62,7 @@ func (r *MySQLUserRepository) FindByID(ctx context.Context, id string, currentUs
 	}), nil
 }
 
-func (r *MySQLUserRepository) FindByName(ctx context.Context, username string, currentUserID string) (*aggregate.User, error) {
+func (r *MySQLUserRepository) FindByName(ctx context.Context, username string, currentUserID *string) (*aggregate.User, error) {
 	query := `
 		SELECT 
 			users.id,
@@ -100,4 +100,51 @@ func (r *MySQLUserRepository) FindByName(ctx context.Context, username string, c
 		FollowingCount: followingCount,
 		FollowerCount:  followerCount,
 	}), nil
+}
+
+func (r *MySQLUserRepository) SearchManyByName(ctx context.Context, username string, currentUserID *string) ([]*aggregate.User, error) {
+	query := `
+		SELECT 
+			users.id,
+			users.username,
+			users.email,
+			users.password,
+			users.created_at,
+			users.updated_at,
+			EXISTS (
+				SELECT 1 FROM follows WHERE follows.follower_id = ? AND follows.followee_id = users.id
+			) AS followed,
+			(SELECT COUNT(*) FROM follows WHERE follower_id = users.id) AS following_count,
+			(SELECT COUNT(*) FROM follows WHERE followee_id = users.id) AS follower_count
+		FROM users
+		WHERE users.username ILIKE CONCAT(?, '%')
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, currentUserID, username)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*aggregate.User
+	for rows.Next() {
+		var u User
+		var followed bool
+		var followingCount, followerCount int
+		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.Password, &u.CreatedAt, &u.UpdatedAt, &followed, &followingCount, &followerCount); err != nil {
+			return nil, err
+		}
+
+		userEntity, err := u.ToEntity()
+		if err != nil {
+			return nil, err
+		}
+
+		users = append(users, aggregate.NewUser(*userEntity, dto.CommonUserAggregate{
+			Followed:       followed,
+			FollowingCount: followingCount,
+			FollowerCount:  followerCount,
+		}))
+	}
+	return users, nil
 }

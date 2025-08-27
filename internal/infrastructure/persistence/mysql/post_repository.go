@@ -45,7 +45,7 @@ func (r *MySQLPostRepository) getFavoritedStatus(ctx context.Context, postID str
 	return favorited, nil
 }
 
-func (r *MySQLPostRepository) FindByID(ctx context.Context, id string, currentUserID string) (*aggregate.Post, error) {
+func (r *MySQLPostRepository) FindByID(ctx context.Context, id string, currentUserID *string) (*aggregate.Post, error) {
 	query := `SELECT posts.id, posts.user_id, posts.content, posts.created_at, posts.updated_at,
 		COALESCE(likes_count.count, 0) AS like_count,
 		COALESCE(favorites_count.count, 0) AS favorite_count,
@@ -87,13 +87,13 @@ func (r *MySQLPostRepository) FindByID(ctx context.Context, id string, currentUs
 		return nil, err
 	}
 
-	if currentUserID != "" {
-		liked, err = r.getLikedStatus(ctx, id, currentUserID)
+	if currentUserID != nil {
+		liked, err = r.getLikedStatus(ctx, id, *currentUserID)
 		if err != nil {
 			return nil, err
 		}
 
-		favorited, err = r.getFavoritedStatus(ctx, id, currentUserID)
+		favorited, err = r.getFavoritedStatus(ctx, id, *currentUserID)
 		if err != nil {
 			return nil, err
 		}

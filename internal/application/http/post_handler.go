@@ -12,14 +12,16 @@ type PostHandlerService struct {
 	like     *service.LikeService
 	repost   *service.RepostService
 	favorite *service.FavoriteService
+	session  *service.SessionService
 }
 
-func NewPostHandlerService(post *service.PostService, like *service.LikeService, repost *service.RepostService, favorite *service.FavoriteService) *PostHandlerService {
+func NewPostHandlerService(post *service.PostService, like *service.LikeService, repost *service.RepostService, favorite *service.FavoriteService, session *service.SessionService) *PostHandlerService {
 	return &PostHandlerService{
 		post:     post,
 		like:     like,
 		repost:   repost,
 		favorite: favorite,
+		session:  session,
 	}
 }
 
@@ -38,15 +40,15 @@ type PostHandler struct {
 	middleware *PostHandlerMiddleware
 }
 
-func NewPostHandler(postService *service.PostService, likeService *service.LikeService, repostService *service.RepostService, favoriteService *service.FavoriteService, authMiddleware *AuthMiddleware) *PostHandler {
+func NewPostHandler(postService *service.PostService, likeService *service.LikeService, repostService *service.RepostService, favoriteService *service.FavoriteService, sessionService *service.SessionService, authMiddleware *AuthMiddleware) *PostHandler {
 	return &PostHandler{
-		service:    NewPostHandlerService(postService, likeService, repostService, favoriteService),
+		service:    NewPostHandlerService(postService, likeService, repostService, favoriteService, sessionService),
 		middleware: NewPostHandlerMiddleware(authMiddleware),
 	}
 }
 
 func (h *PostHandler) RegisterRoutes(app *fiber.App) {
-	apiPosts := app.Group("/api/v1/posts")
+	apiPosts := app.Group("/api/v1/public/posts")
 	apiPosts.Get("/:id", h.GetPostByID)
 
 	apiPostsProtected := app.Group("/api/v1/posts", h.middleware.auth.Handler)
@@ -61,6 +63,21 @@ func (h *PostHandler) RegisterRoutes(app *fiber.App) {
 
 	apiRepostsProtected := app.Group("/api/v1/reposts", h.middleware.auth.Handler)
 	apiRepostsProtected.Delete("/:id", h.UnrepostPost)
+}
+
+func (p *PostHandler) getCurrentUserId(ctx *fiber.Ctx) *string {
+	var currentUserID string
+
+	// Try to read bearer token and get session/user, but it's optional
+	// Such that when getting the user, we know if we have followed that person or not yet
+	token, err := readBearerToken(ctx)
+	if err == nil && token != "" {
+		session, err := p.service.session.GetByID(ctx.Context(), token)
+		if err == nil && !session.IsExpired() {
+			currentUserID = session.UserID.String()
+		}
+	}
+	return &currentUserID
 }
 
 func (h *PostHandler) CreatePost(ctx *fiber.Ctx) error {
@@ -96,7 +113,8 @@ func (h *PostHandler) DeletePost(ctx *fiber.Ctx) error {
 	}
 	id := ctx.Params("id")
 
-	post, err := h.service.post.GetByID(ctx.Context(), id, user.ID.String())
+	userId := user.ID.String()
+	post, err := h.service.post.GetByID(ctx.Context(), id, &userId)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
@@ -124,7 +142,8 @@ func (h *PostHandler) UpdatePost(ctx *fiber.Ctx) error {
 	body.UserID = user.ID
 	body.ID = id
 
-	post, err := h.service.post.GetByID(ctx.Context(), id, user.ID.String())
+	userId := user.ID.String()
+	post, err := h.service.post.GetByID(ctx.Context(), id, &userId)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
@@ -143,8 +162,10 @@ func (h *PostHandler) UpdatePost(ctx *fiber.Ctx) error {
 }
 
 func (h *PostHandler) GetPostByID(ctx *fiber.Ctx) error {
+	currentUserId := h.getCurrentUserId(ctx)
+
 	id := ctx.Params("id")
-	post, err := h.service.post.GetByID(ctx.Context(), id, "")
+	post, err := h.service.post.GetByID(ctx.Context(), id, currentUserId)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
@@ -161,7 +182,8 @@ func (h *PostHandler) LikePost(ctx *fiber.Ctx) error {
 	}
 
 	id := ctx.Params("id")
-	post, err := h.service.post.GetByID(ctx.Context(), id, user.ID.String())
+	userId := user.ID.String()
+	post, err := h.service.post.GetByID(ctx.Context(), id, &userId)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
@@ -176,6 +198,9 @@ func (h *PostHandler) LikePost(ctx *fiber.Ctx) error {
 		}
 	}
 
+	// Invalidate cache for the post and user feed (post is already invalidated by like service)
+	h.service.post.InvalidateCacheForUserId(ctx.Context(), userId)
+
 	return SuccessResponse(ctx, nil)
 }
 
@@ -186,7 +211,8 @@ func (h *PostHandler) UnlikePost(ctx *fiber.Ctx) error {
 	}
 
 	id := ctx.Params("id")
-	post, err := h.service.post.GetByID(ctx.Context(), id, user.ID.String())
+	userId := user.ID.String()
+	post, err := h.service.post.GetByID(ctx.Context(), id, &userId)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
@@ -201,6 +227,8 @@ func (h *PostHandler) UnlikePost(ctx *fiber.Ctx) error {
 		}
 	}
 
+	h.service.post.InvalidateCacheForUserId(ctx.Context(), userId)
+
 	return SuccessResponse(ctx, nil)
 }
 
@@ -211,7 +239,8 @@ func (h *PostHandler) FavoritePost(ctx *fiber.Ctx) error {
 	}
 
 	id := ctx.Params("id")
-	post, err := h.service.post.GetByID(ctx.Context(), id, user.ID.String())
+	userId := user.ID.String()
+	post, err := h.service.post.GetByID(ctx.Context(), id, &userId)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
@@ -226,6 +255,8 @@ func (h *PostHandler) FavoritePost(ctx *fiber.Ctx) error {
 		}
 	}
 
+	h.service.post.InvalidateCacheForUserId(ctx.Context(), userId)
+
 	return SuccessResponse(ctx, nil)
 }
 
@@ -236,7 +267,8 @@ func (h *PostHandler) UnfavoritePost(ctx *fiber.Ctx) error {
 	}
 
 	id := ctx.Params("id")
-	post, err := h.service.post.GetByID(ctx.Context(), id, user.ID.String())
+	userId := user.ID.String()
+	post, err := h.service.post.GetByID(ctx.Context(), id, &userId)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
@@ -250,6 +282,8 @@ func (h *PostHandler) UnfavoritePost(ctx *fiber.Ctx) error {
 			return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
 		}
 	}
+
+	h.service.post.InvalidateCacheForUserId(ctx.Context(), userId)
 
 	return SuccessResponse(ctx, nil)
 }
@@ -270,7 +304,8 @@ func (h *PostHandler) RepostPost(ctx *fiber.Ctx) error {
 		return ErrorResponse(ctx, fiber.StatusBadRequest, err)
 	}
 
-	post, err := h.service.post.GetByID(ctx.Context(), id, user.ID.String())
+	userId := user.ID.String()
+	post, err := h.service.post.GetByID(ctx.Context(), id, &userId)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}

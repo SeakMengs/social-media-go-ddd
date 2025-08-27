@@ -38,7 +38,7 @@ func (s *PostService) Create(ctx context.Context, np dto.NewPost) (*entity.Post,
 	return post, nil
 }
 
-func (s *PostService) GetByID(ctx context.Context, id string, currentUserID string) (*aggregate.Post, error) {
+func (s *PostService) GetByID(ctx context.Context, id string, currentUserID *string) (*aggregate.Post, error) {
 	cacheKey := s.cacheKeys.Post(id)
 	val, err := s.cache.Get(ctx, cacheKey)
 	if !cache.IsCacheError(err) {
@@ -141,4 +141,9 @@ func (s *PostService) GetFeed(ctx context.Context, userID string, limit, offset 
 	}
 
 	return posts, total, nil
+}
+
+func (s *PostService) InvalidateCacheForUserId(ctx context.Context, userId string) {
+	s.cache.Delete(ctx, s.cacheKeys.UserPosts(userId))
+	s.cache.DeleteByPattern(ctx, s.cacheKeys.UserFeedPattern(userId))
 }

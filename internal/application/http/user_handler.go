@@ -1,6 +1,7 @@
 package http
 
 import (
+	"database/sql"
 	"errors"
 	"social-media-go-ddd/internal/application/service"
 	"social-media-go-ddd/internal/domain/aggregate"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5"
 )
 
 type UserHandlerService struct {
@@ -61,15 +63,32 @@ func (h *UserHandler) RegisterRoutes(app *fiber.App) {
 	apiUsersProtected.Delete("/:id/follow", h.UnfollowUser)
 
 	// Public user routes
-	apiUsers := app.Group("/api/v1/users")
+	apiUsers := app.Group("/api/v1/public/users")
+	apiUsers.Get("/name/:name", h.GetUsersByName)
 	apiUsers.Get("/:id", h.GetUserByID)
 	apiUsers.Get("/:id/posts", h.GetUserPosts)
+	apiUsers.Get("/:id/reposts", h.GetUserReposts)
 
 	// No middleware route
 	apiAuth := app.Group("/api/v1/auth")
 	apiAuth.Post("/register", h.CreateUser)
 	apiAuth.Post("/login", h.Login)
 	apiAuth.Delete("/logout", h.Logout)
+}
+
+func (h *UserHandler) getCurrentUserId(ctx *fiber.Ctx) *string {
+	var currentUserID string
+
+	// Try to read bearer token and get session/user, but it's optional
+	// Such that when getting the user, we know if we have followed that person or not yet
+	token, err := readBearerToken(ctx)
+	if err == nil && token != "" {
+		session, err := h.service.session.GetByID(ctx.Context(), token)
+		if err == nil && !session.IsExpired() {
+			currentUserID = session.UserID.String()
+		}
+	}
+	return &currentUserID
 }
 
 func (h *UserHandler) CreateUser(ctx *fiber.Ctx) error {
@@ -93,17 +112,7 @@ func (h *UserHandler) CreateUser(ctx *fiber.Ctx) error {
 }
 
 func (h *UserHandler) GetUserByID(ctx *fiber.Ctx) error {
-	var currentUserID string
-
-	// Try to read bearer token and get session/user, but it's optional
-	// Such that when getting the user, we know if we have followed that person or not yet
-	token, err := readBearerToken(ctx)
-	if err == nil && token != "" {
-		session, err := h.service.session.GetByID(ctx.Context(), token)
-		if err == nil && !session.IsExpired() {
-			currentUserID = session.UserID.String()
-		}
-	}
+	currentUserID := h.getCurrentUserId(ctx)
 
 	id := ctx.Params("id")
 	user, err := h.service.user.GetByID(ctx.Context(), id, currentUserID)
@@ -113,6 +122,23 @@ func (h *UserHandler) GetUserByID(ctx *fiber.Ctx) error {
 
 	return SuccessResponse(ctx, fiber.Map{
 		"user": user,
+	})
+}
+
+func (h *UserHandler) GetUsersByName(ctx *fiber.Ctx) error {
+	currentUserID := h.getCurrentUserId(ctx)
+
+	name := ctx.Params("name")
+	users, err := h.service.user.GetManyByName(ctx.Context(), name, currentUserID)
+	if err != nil {
+		if errors.Is(pgx.ErrNoRows, err) || errors.Is(sql.ErrNoRows, err) {
+			return ErrorResponse(ctx, fiber.StatusNotFound, "no users found")
+		}
+		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	}
+
+	return SuccessResponse(ctx, fiber.Map{
+		"users": users,
 	})
 }
 
@@ -166,7 +192,7 @@ func (h *UserHandler) Login(ctx *fiber.Ctx) error {
 		return ErrorResponse(ctx, fiber.StatusBadRequest, err)
 	}
 
-	user, err := h.service.user.GetByName(ctx.Context(), body.Username, "")
+	user, err := h.service.user.GetByName(ctx.Context(), body.Username, nil)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
@@ -265,6 +291,22 @@ func (h *UserHandler) GetUserPosts(ctx *fiber.Ctx) error {
 	})
 }
 
+func (h *UserHandler) GetUserReposts(ctx *fiber.Ctx) error {
+	id := ctx.Params("id")
+	reposts, err := h.service.repost.GetByUserID(ctx.Context(), id)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	}
+
+	if reposts == nil {
+		reposts = []*aggregate.Post{}
+	}
+
+	return SuccessResponse(ctx, fiber.Map{
+		"reposts": reposts,
+	})
+}
+
 func (h *UserHandler) FollowUser(ctx *fiber.Ctx) error {
 	user, err := GetUserFromCtx(ctx)
 	if err != nil {
@@ -272,7 +314,8 @@ func (h *UserHandler) FollowUser(ctx *fiber.Ctx) error {
 	}
 
 	targetID := ctx.Params("id")
-	targetUser, err := h.service.user.GetByID(ctx.Context(), targetID, user.ID.String())
+	userId := user.ID.String()
+	targetUser, err := h.service.user.GetByID(ctx.Context(), targetID, &userId)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}
@@ -299,7 +342,8 @@ func (h *UserHandler) UnfollowUser(ctx *fiber.Ctx) error {
 	}
 
 	targetID := ctx.Params("id")
-	targetUser, err := h.service.user.GetByID(ctx.Context(), targetID, user.ID.String())
+	userId := user.ID.String()
+	targetUser, err := h.service.user.GetByID(ctx.Context(), targetID, &userId)
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusNotFound, err)
 	}

@@ -2,8 +2,8 @@ import { z } from "zod";
 
 export const BaseModelSchema = z.object({
     id: z.string(),
-    createdAt: z.coerce.date(),
-    updatedAt: z.coerce.date(),
+    createdAt: z.coerce.date().optional(),
+    updatedAt: z.coerce.date().optional(),
 });
 export type BaseModel = z.infer<typeof BaseModelSchema>;
 
@@ -12,12 +12,6 @@ export const UserSchema = BaseModelSchema.extend({
     email: z.email(),
 });
 export type User = z.infer<typeof UserSchema>;
-
-export const PostSchema = BaseModelSchema.extend({
-    userId: z.string(),
-    content: z.string(),
-});
-export type Post = z.infer<typeof PostSchema>;
 
 export const LikeSchema = BaseModelSchema.extend({
     userId: z.string(),
@@ -49,3 +43,43 @@ export const FollowSchema = BaseModelSchema.extend({
     followeeId: z.string(),
 });
 export type Follow = z.infer<typeof FollowSchema>;
+
+export const PostType = {
+    TEXT: "text",
+    REPOST: "repost",
+};
+
+export type PostType = typeof PostType[keyof typeof PostType];
+
+export const PostSchema = BaseModelSchema.extend({
+    userId: z.string(),
+    content: z.string(),
+});
+export type Post = z.infer<typeof PostSchema>;
+
+export const AggregatePostSchema = PostSchema.extend({
+    likeCount: z.number(),
+    repostCount: z.number(),
+    favoriteCount: z.number(),
+    favorited: z.boolean().default(false),
+    liked: z.boolean().default(false),
+    type: z.enum([PostType.TEXT, PostType.REPOST]),
+    repost: RepostSchema.optional(),
+    user: UserSchema,
+    // if type is repost
+    repostUser: UserSchema.optional(),
+});
+export type AggregatePost = z.infer<typeof AggregatePostSchema> & {
+    type: typeof PostType.REPOST;
+    repostUser: User;
+} | (z.infer<typeof AggregatePostSchema> & {
+    type: typeof PostType.TEXT;
+    repostUser?: undefined;
+});
+
+export const AggregateUserSchema = UserSchema.extend({
+    followed: z.boolean(),
+    followerCount: z.number(),
+    followingCount: z.number(),
+});
+export type AggregateUser = z.infer<typeof AggregateUserSchema>;

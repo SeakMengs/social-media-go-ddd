@@ -5,9 +5,10 @@ import { AuthUserResult } from "..";
 import { validateSession } from "./session";
 import { cache } from "react";
 import { api, apiWithAuth } from "@/utils/axios";
-import { ResponseJson } from "@/utils/response";
+import { ResponseJson, responseSomethingWentWrong } from "@/utils/response";
 import { z } from "zod";
 import { setSessionCookie } from "./cookie";
+import { SessionSchema, UserSchema } from "@/types/model";
 
 const logger = createScopedLogger("src:auth:action");
 
@@ -27,49 +28,38 @@ export const getAuthUser = cache(async (): Promise<AuthUserResult> => {
   return null;
 });
 
+const loginResponseSchema = z.object({
+  session: SessionSchema,
+  user: UserSchema,
+});
 export async function login(data: {
   username: string;
   password: string;
-}): Promise<boolean> {
+}): Promise<ResponseJson<z.infer<typeof loginResponseSchema>>> {
   try {
-    const loginResponseSchema = z.object({
-      session: z.object({
-        expireAt: z.string(),
-        id: z.uuid(),
-      }),
-      user: z.object({
-        id: z.uuid(),
-        createdAt: z.string(),
-        updatedAt: z.string(),
-        username: z.string(),
-        email: z.email(),
-      }),
-    });
-
     const response = await api.post<
       ResponseJson<z.infer<typeof loginResponseSchema>>
     >("/api/v1/auth/login", data);
     if (!response.data.success) {
       logger.debug("Login failed, err: ", response.data.error);
-      return false;
+      return response.data;
     }
 
     const validated = loginResponseSchema.safeParse(response.data.data);
     if (!validated.success) {
       logger.debug("Login response validation failed, err: ", validated.error);
-      return false;
+      return response.data;
     }
 
     const { session } = validated.data;
 
     await setSessionCookie(session.id, new Date(session.expireAt));
 
-    return true;
+    return response.data;
   } catch (error) {
     logger.error("Error logging in", error);
+    return responseSomethingWentWrong("Error logging in (catch)");
   }
-
-  return false;
 }
 
 export async function logout(): Promise<void> {

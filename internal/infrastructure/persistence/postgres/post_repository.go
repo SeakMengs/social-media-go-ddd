@@ -44,7 +44,7 @@ func (r *PgPostRepository) getFavoritedStatus(ctx context.Context, postID string
 	return favorited, nil
 }
 
-func (r *PgPostRepository) FindByID(ctx context.Context, id string, currentUserID string) (*aggregate.Post, error) {
+func (r *PgPostRepository) FindByID(ctx context.Context, id string, currentUserID *string) (*aggregate.Post, error) {
 	query := `SELECT posts.id, 
        posts.user_id, 
        posts.content, 
@@ -99,13 +99,13 @@ func (r *PgPostRepository) FindByID(ctx context.Context, id string, currentUserI
 		return nil, err
 	}
 
-	if currentUserID != "" {
-		liked, err = r.getLikedStatus(ctx, id, currentUserID)
+	if currentUserID != nil {
+		liked, err = r.getLikedStatus(ctx, id, *currentUserID)
 		if err != nil {
 			return nil, err
 		}
 
-		favorited, err = r.getFavoritedStatus(ctx, id, currentUserID)
+		favorited, err = r.getFavoritedStatus(ctx, id, *currentUserID)
 		if err != nil {
 			return nil, err
 		}

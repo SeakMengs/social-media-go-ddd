@@ -17,6 +17,10 @@ func (c *cacheKeys) UserByName(name string) string {
 	return fmt.Sprintf("user:name:%s", name)
 }
 
+func (c *cacheKeys) UsersByName(name string) string {
+	return fmt.Sprintf("users:name:%s", name)
+}
+
 func (c *cacheKeys) UserFeed(userID string, limit, offset int) string {
 	return fmt.Sprintf("user:feed:%s:%d:%d", userID, limit, offset)
 }

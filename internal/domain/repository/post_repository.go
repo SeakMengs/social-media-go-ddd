@@ -8,7 +8,7 @@ import (
 
 type PostRepository interface {
 	Save(ctx context.Context, p *entity.Post) error
-	FindByID(ctx context.Context, id string, currentUserID string) (*aggregate.Post, error)
+	FindByID(ctx context.Context, id string, currentUserID *string) (*aggregate.Post, error)
 	FindByUserID(ctx context.Context, userID string) ([]*aggregate.Post, error)
 	Delete(ctx context.Context, id string, userID string) error
 	Update(ctx context.Context, p *entity.Post) error
