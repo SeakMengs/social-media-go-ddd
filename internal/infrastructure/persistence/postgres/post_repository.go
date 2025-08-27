@@ -78,9 +78,9 @@ func (r *PgPostRepository) FindByID(ctx context.Context, id string, currentUserI
 		) reposts_count ON reposts_count.post_id = posts.id
 	WHERE posts.id = $1`
 
-	var post entity.Post
+	var post Post
 	var likeCount, favoriteCount, repostCount int
-	var user entity.User
+	var user User
 	var liked, favorited bool
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&post.ID,
@@ -111,7 +111,17 @@ func (r *PgPostRepository) FindByID(ctx context.Context, id string, currentUserI
 		}
 	}
 
-	return aggregate.NewPost(post, user, dto.CommonPostAggregate{
+	ePost, err := post.ToEntity()
+	if err != nil {
+		return nil, err
+	}
+
+	eUser, err := user.ToEntity()
+	if err != nil {
+		return nil, err
+	}
+
+	return aggregate.NewPost(*ePost, *eUser, dto.CommonPostAggregate{
 		LikeCount:     likeCount,
 		FavoriteCount: favoriteCount,
 		RepostCount:   repostCount,
@@ -162,7 +172,7 @@ func (r *PgPostRepository) FindByUserID(ctx context.Context, userID string) ([]*
 
 	var posts []*aggregate.Post
 	for rows.Next() {
-		var post entity.Post
+		var post Post
 		var likeCount, favoriteCount, repostCount int
 
 		if err := rows.Scan(
@@ -188,7 +198,12 @@ func (r *PgPostRepository) FindByUserID(ctx context.Context, userID string) ([]*
 			return nil, err
 		}
 
-		posts = append(posts, aggregate.NewPost(post, user, dto.CommonPostAggregate{
+		ePost, err := post.ToEntity()
+		if err != nil {
+			return nil, err
+		}
+
+		posts = append(posts, aggregate.NewPost(*ePost, user, dto.CommonPostAggregate{
 			LikeCount:     likeCount,
 			FavoriteCount: favoriteCount,
 			RepostCount:   repostCount,
@@ -313,10 +328,10 @@ func (r *PgPostRepository) FindFeed(ctx context.Context, userID string, limit, o
 
 	var feed []*aggregate.Post
 	for rows.Next() {
-		var post entity.Post
+		var post Post
 		var likeCount, favoriteCount, repostCount int
 		var feedTime time.Time
-		var postUser entity.User
+		var postUser User
 
 		// Nullable repost fields,
 		var repostID uuid.UUID
@@ -356,6 +371,16 @@ func (r *PgPostRepository) FindFeed(ctx context.Context, userID string, limit, o
 			RepostCount:   repostCount,
 		}
 
+		ePostUser, err := postUser.ToEntity()
+		if err != nil {
+			return nil, 0, err
+		}
+
+		ePost, err := post.ToEntity()
+		if err != nil {
+			return nil, 0, err
+		}
+
 		// Check if this is a repost (repost_id is not null)
 		if repostID != uuid.Nil {
 			repost := entity.Repost{
@@ -372,16 +397,21 @@ func (r *PgPostRepository) FindFeed(ctx context.Context, userID string, limit, o
 				repost.Comment = *repostComment
 			}
 
-			var repostUser entity.User
+			var repostUser User
 			err = r.pool.QueryRow(ctx, "SELECT id, username, email FROM users WHERE id = $1", repostUserID).Scan(&repostUser.ID, &repostUser.Username, &repostUser.Email)
 			if err != nil {
 				return nil, 0, err
 			}
 
-			feed = append(feed, aggregate.NewRepost(post, &repost, postUser, &repostUser, commonAggregate))
+			eRepostUser, err := repostUser.ToEntity()
+			if err != nil {
+				return nil, 0, err
+			}
+
+			feed = append(feed, aggregate.NewRepost(*ePost, &repost, *ePostUser, eRepostUser, commonAggregate))
 		} else {
 			// Regular post
-			feed = append(feed, aggregate.NewPost(post, postUser, commonAggregate))
+			feed = append(feed, aggregate.NewPost(*ePost, *ePostUser, commonAggregate))
 		}
 	}
 

@@ -45,9 +45,14 @@ func (r *MySQLRepostRepository) Delete(ctx context.Context, id string) error {
 }
 
 func (r *MySQLRepostRepository) FindByUserID(ctx context.Context, userID string) ([]*aggregate.Post, error) {
-	var repostUser entity.User
+	var repostUser User
 	err := r.db.QueryRowContext(ctx, "SELECT id, username, email FROM users WHERE id=?", userID).
 		Scan(&repostUser.ID, &repostUser.Username, &repostUser.Email)
+	if err != nil {
+		return nil, err
+	}
+
+	eRepostUser, err := repostUser.ToEntity()
 	if err != nil {
 		return nil, err
 	}
@@ -77,10 +82,10 @@ func (r *MySQLRepostRepository) FindByUserID(ctx context.Context, userID string)
 
 	var reposts []*aggregate.Post
 	for rows.Next() {
-		var post entity.Post
+		var post Post
 		var likeCount, favoriteCount, repostCount int
-		var repost entity.Repost
-		var user entity.User
+		var repost Repost
+		var user User
 
 		if err := rows.Scan(
 			&post.ID,
@@ -104,7 +109,22 @@ func (r *MySQLRepostRepository) FindByUserID(ctx context.Context, userID string)
 			return nil, err
 		}
 
-		reposts = append(reposts, aggregate.NewRepost(post, &repost, user, &repostUser, dto.CommonPostAggregate{
+		ePost, err := post.ToEntity()
+		if err != nil {
+			return nil, err
+		}
+
+		eRepost, err := repost.ToEntity()
+		if err != nil {
+			return nil, err
+		}
+
+		eUser, err := user.ToEntity()
+		if err != nil {
+			return nil, err
+		}
+
+		reposts = append(reposts, aggregate.NewRepost(*ePost, eRepost, *eUser, eRepostUser, dto.CommonPostAggregate{
 			LikeCount:     likeCount,
 			FavoriteCount: favoriteCount,
 			RepostCount:   repostCount,

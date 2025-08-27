@@ -291,10 +291,10 @@ func (r *MySQLPostRepository) FindFeed(ctx context.Context, userID string, limit
 
 	var feed []*aggregate.Post
 	for rows.Next() {
-		var post entity.Post
+		var post Post
 		var likeCount, favoriteCount, repostCount int
 		var feedTime time.Time
-		var postUser entity.User
+		var postUser User
 
 		// Nullable repost fields
 		var repostID uuid.UUID
@@ -333,6 +333,16 @@ func (r *MySQLPostRepository) FindFeed(ctx context.Context, userID string, limit
 			RepostCount:   repostCount,
 		}
 
+		ePostUser, err := postUser.ToEntity()
+		if err != nil {
+			return nil, 0, err
+		}
+
+		ePost, err := post.ToEntity()
+		if err != nil {
+			return nil, 0, err
+		}
+
 		// Check if this is a repost (repost_id is not null)
 		if repostID != uuid.Nil {
 			repost := entity.Repost{
@@ -349,16 +359,21 @@ func (r *MySQLPostRepository) FindFeed(ctx context.Context, userID string, limit
 				repost.Comment = *repostComment
 			}
 
-			var repostUser entity.User
+			var repostUser User
 			err = r.db.QueryRowContext(ctx, "SELECT id, username, email FROM users WHERE id = ?", repostUserID).Scan(&repostUser.ID, &repostUser.Username, &repostUser.Email)
 			if err != nil {
 				return nil, 0, err
 			}
 
-			feed = append(feed, aggregate.NewRepost(post, &repost, postUser, &repostUser, commonAggregate))
+			eRepostUser, err := repostUser.ToEntity()
+			if err != nil {
+				return nil, 0, err
+			}
+
+			feed = append(feed, aggregate.NewRepost(*ePost, &repost, *ePostUser, eRepostUser, commonAggregate))
 		} else {
 			// Regular post
-			feed = append(feed, aggregate.NewPost(post, postUser, commonAggregate))
+			feed = append(feed, aggregate.NewPost(*ePost, *ePostUser, commonAggregate))
 		}
 	}
 
