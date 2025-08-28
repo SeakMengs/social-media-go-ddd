@@ -144,6 +144,7 @@ func (s *PostService) GetFeed(ctx context.Context, userID string, limit, offset 
 }
 
 func (s *PostService) InvalidateCacheForUserId(ctx context.Context, userId string) {
+	s.cache.Delete(ctx, s.cacheKeys.UserFavoritePosts(userId))
 	s.cache.Delete(ctx, s.cacheKeys.UserPosts(userId))
 	s.cache.DeleteByPattern(ctx, s.cacheKeys.UserFeedPattern(userId))
 }

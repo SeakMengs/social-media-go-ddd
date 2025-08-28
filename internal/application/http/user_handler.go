@@ -14,20 +14,22 @@ import (
 )
 
 type UserHandlerService struct {
-	user    *service.UserService
-	session *service.SessionService
-	post    *service.PostService
-	repost  *service.RepostService
-	follow  *service.FollowService
+	user     *service.UserService
+	session  *service.SessionService
+	post     *service.PostService
+	repost   *service.RepostService
+	follow   *service.FollowService
+	favorite *service.FavoriteService
 }
 
-func NewUserHandlerService(user *service.UserService, session *service.SessionService, post *service.PostService, repost *service.RepostService, follow *service.FollowService) *UserHandlerService {
+func NewUserHandlerService(user *service.UserService, session *service.SessionService, post *service.PostService, repost *service.RepostService, follow *service.FollowService, favorite *service.FavoriteService) *UserHandlerService {
 	return &UserHandlerService{
-		user:    user,
-		session: session,
-		post:    post,
-		repost:  repost,
-		follow:  follow,
+		user:     user,
+		session:  session,
+		post:     post,
+		repost:   repost,
+		follow:   follow,
+		favorite: favorite,
 	}
 }
 
@@ -46,9 +48,9 @@ type UserHandler struct {
 	middleware *UserHandlerMiddleware
 }
 
-func NewUserHandler(userService *service.UserService, sessionService *service.SessionService, postService *service.PostService, repostService *service.RepostService, followService *service.FollowService, authMiddleware *AuthMiddleware) *UserHandler {
+func NewUserHandler(userService *service.UserService, sessionService *service.SessionService, postService *service.PostService, repostService *service.RepostService, followService *service.FollowService, favoriteService *service.FavoriteService, authMiddleware *AuthMiddleware) *UserHandler {
 	return &UserHandler{
-		service:    NewUserHandlerService(userService, sessionService, postService, repostService, followService),
+		service:    NewUserHandlerService(userService, sessionService, postService, repostService, followService, favoriteService),
 		middleware: NewUserHandlerMiddleware(authMiddleware),
 	}
 }
@@ -58,6 +60,7 @@ func (h *UserHandler) RegisterRoutes(app *fiber.App) {
 	apiUsersProtected.Get("/me", h.Me)
 	apiUsersProtected.Get("/me/posts", h.GetMyPosts)
 	apiUsersProtected.Get("/me/feed", h.GetMyFeed)
+	apiUsersProtected.Get("/me/posts/favorites", h.GetMyFavoritePosts)
 	apiUsersProtected.Get("/me/reposts", h.GetMyReposts)
 	apiUsersProtected.Post("/:id/follow", h.FollowUser)
 	apiUsersProtected.Delete("/:id/follow", h.UnfollowUser)
@@ -242,6 +245,25 @@ func (h *UserHandler) GetMyPosts(ctx *fiber.Ctx) error {
 	}
 
 	posts, err := h.service.post.GetByUserID(ctx.Context(), user.ID.String())
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
+	}
+
+	if posts == nil {
+		posts = []*aggregate.Post{}
+	}
+
+	return SuccessResponse(ctx, fiber.Map{
+		"posts": posts,
+	})
+}
+func (h *UserHandler) GetMyFavoritePosts(ctx *fiber.Ctx) error {
+	user, err := GetUserFromCtx(ctx)
+	if err != nil {
+		return ErrorResponse(ctx, fiber.StatusUnauthorized, err)
+	}
+
+	posts, err := h.service.favorite.GetByUserID(ctx.Context(), user.ID.String())
 	if err != nil {
 		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
 	}

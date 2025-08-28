@@ -26,27 +26,27 @@ func (r *PgPostRepository) Save(ctx context.Context, p *entity.Post) error {
 	return err
 }
 
-func (r *PgPostRepository) getLikedStatus(ctx context.Context, postID string, userID string) (bool, error) {
+func getLikedStatus(ctx context.Context, pool *pgxpool.Pool, postID string, userID string) (bool, error) {
 	var liked bool
-	err := r.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM likes WHERE post_id=$1 AND user_id=$2)", postID, userID).Scan(&liked)
+	err := pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM likes WHERE post_id=$1 AND user_id=$2)", postID, userID).Scan(&liked)
 	if err != nil {
 		return false, err
 	}
 	return liked, nil
 }
 
-func (r *PgPostRepository) getFavoritedStatus(ctx context.Context, postID string, userID string) (bool, error) {
+func getFavoritedStatus(ctx context.Context, pool *pgxpool.Pool, postID string, userID string) (bool, error) {
 	var favorited bool
-	err := r.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM favorites WHERE post_id=$1 AND user_id=$2)", postID, userID).Scan(&favorited)
+	err := pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM favorites WHERE post_id=$1 AND user_id=$2)", postID, userID).Scan(&favorited)
 	if err != nil {
 		return false, err
 	}
 	return favorited, nil
 }
 
-func (r *PgPostRepository) getRepostedStatus(ctx context.Context, postID string, userID string) (bool, error) {
+func getRepostedStatus(ctx context.Context, pool *pgxpool.Pool, postID string, userID string) (bool, error) {
 	var reposted bool
-	err := r.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM reposts WHERE post_id=$1 AND user_id=$2)", postID, userID).Scan(&reposted)
+	err := pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM reposts WHERE post_id=$1 AND user_id=$2)", postID, userID).Scan(&reposted)
 	if err != nil {
 		return false, err
 	}
@@ -109,17 +109,17 @@ func (r *PgPostRepository) FindByID(ctx context.Context, id string, currentUserI
 	}
 
 	if currentUserID != nil {
-		liked, err = r.getLikedStatus(ctx, id, *currentUserID)
+		liked, err = getLikedStatus(ctx, r.pool, id, *currentUserID)
 		if err != nil {
 			return nil, err
 		}
 
-		favorited, err = r.getFavoritedStatus(ctx, id, *currentUserID)
+		favorited, err = getFavoritedStatus(ctx, r.pool, id, *currentUserID)
 		if err != nil {
 			return nil, err
 		}
 
-		reposted, err = r.getRepostedStatus(ctx, id, *currentUserID)
+		reposted, err = getRepostedStatus(ctx, r.pool, id, *currentUserID)
 		if err != nil {
 			return nil, err
 		}
@@ -203,17 +203,17 @@ func (r *PgPostRepository) FindByUserID(ctx context.Context, userID string) ([]*
 			return nil, err
 		}
 
-		liked, err := r.getLikedStatus(ctx, post.ID.String(), userID)
+		liked, err := getLikedStatus(ctx, r.pool, post.ID.String(), userID)
 		if err != nil {
 			return nil, err
 		}
 
-		favorited, err := r.getFavoritedStatus(ctx, post.ID.String(), userID)
+		favorited, err := getFavoritedStatus(ctx, r.pool, post.ID.String(), userID)
 		if err != nil {
 			return nil, err
 		}
 
-		reposted, err := r.getRepostedStatus(ctx, post.ID.String(), userID)
+		reposted, err := getRepostedStatus(ctx, r.pool, post.ID.String(), userID)
 		if err != nil {
 			return nil, err
 		}
@@ -387,17 +387,17 @@ func (r *PgPostRepository) FindFeed(ctx context.Context, userID string, limit, o
 			return nil, 0, err
 		}
 
-		liked, err = r.getLikedStatus(ctx, post.ID.String(), userID)
+		liked, err = getLikedStatus(ctx, r.pool, post.ID.String(), userID)
 		if err != nil {
 			return nil, 0, err
 		}
 
-		favorited, err = r.getFavoritedStatus(ctx, post.ID.String(), userID)
+		favorited, err = getFavoritedStatus(ctx, r.pool, post.ID.String(), userID)
 		if err != nil {
 			return nil, 0, err
 		}
 
-		reposted, err = r.getRepostedStatus(ctx, post.ID.String(), userID)
+		reposted, err = getRepostedStatus(ctx, r.pool, post.ID.String(), userID)
 		if err != nil {
 			return nil, 0, err
 		}

@@ -27,27 +27,27 @@ func (r *MySQLPostRepository) Save(ctx context.Context, p *entity.Post) error {
 	return err
 }
 
-func (r *MySQLPostRepository) getLikedStatus(ctx context.Context, postID string, userID string) (bool, error) {
+func getLikedStatus(ctx context.Context, db *sql.DB, postID string, userID string) (bool, error) {
 	var liked bool
-	err := r.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM likes WHERE post_id=? AND user_id=?)", postID, userID).Scan(&liked)
+	err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM likes WHERE post_id=? AND user_id=?)", postID, userID).Scan(&liked)
 	if err != nil {
 		return false, err
 	}
 	return liked, nil
 }
 
-func (r *MySQLPostRepository) getFavoritedStatus(ctx context.Context, postID string, userID string) (bool, error) {
+func getFavoritedStatus(ctx context.Context, db *sql.DB, postID string, userID string) (bool, error) {
 	var favorited bool
-	err := r.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM favorites WHERE post_id=? AND user_id=?)", postID, userID).Scan(&favorited)
+	err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM favorites WHERE post_id=? AND user_id=?)", postID, userID).Scan(&favorited)
 	if err != nil {
 		return false, err
 	}
 	return favorited, nil
 }
 
-func (r *MySQLPostRepository) getRepostedStatus(ctx context.Context, postID string, userID string) (bool, error) {
+func getRepostedStatus(ctx context.Context, db *sql.DB, postID string, userID string) (bool, error) {
 	var reposted bool
-	err := r.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM reposts WHERE post_id=? AND user_id=?)", postID, userID).Scan(&reposted)
+	err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM reposts WHERE post_id=? AND user_id=?)", postID, userID).Scan(&reposted)
 	if err != nil {
 		return false, err
 	}
@@ -97,17 +97,17 @@ func (r *MySQLPostRepository) FindByID(ctx context.Context, id string, currentUs
 	}
 
 	if currentUserID != nil {
-		liked, err = r.getLikedStatus(ctx, id, *currentUserID)
+		liked, err = getLikedStatus(ctx, r.db, id, *currentUserID)
 		if err != nil {
 			return nil, err
 		}
 
-		favorited, err = r.getFavoritedStatus(ctx, id, *currentUserID)
+		favorited, err = getFavoritedStatus(ctx, r.db, id, *currentUserID)
 		if err != nil {
 			return nil, err
 		}
 
-		reposted, err = r.getRepostedStatus(ctx, id, *currentUserID)
+		reposted, err = getRepostedStatus(ctx, r.db, id, *currentUserID)
 		if err != nil {
 			return nil, err
 		}
@@ -171,17 +171,17 @@ func (r *MySQLPostRepository) FindByUserID(ctx context.Context, userID string) (
 			return nil, err
 		}
 
-		liked, err := r.getLikedStatus(ctx, post.ID.String(), userID)
+		liked, err := getLikedStatus(ctx, r.db, post.ID.String(), userID)
 		if err != nil {
 			return nil, err
 		}
 
-		favorited, err := r.getFavoritedStatus(ctx, post.ID.String(), userID)
+		favorited, err := getFavoritedStatus(ctx, r.db, post.ID.String(), userID)
 		if err != nil {
 			return nil, err
 		}
 
-		reposted, err := r.getRepostedStatus(ctx, post.ID.String(), userID)
+		reposted, err := getRepostedStatus(ctx, r.db, post.ID.String(), userID)
 		if err != nil {
 			return nil, err
 		}

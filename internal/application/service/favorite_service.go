@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"social-media-go-ddd/internal/domain/aggregate"
 	"social-media-go-ddd/internal/domain/dto"
 	"social-media-go-ddd/internal/domain/entity"
 	"social-media-go-ddd/internal/domain/repository"
@@ -38,4 +40,27 @@ func (s *FavoriteService) Delete(ctx context.Context, dl dto.DeleteFavorite) err
 	// Invalidate post cache since favorite count changed
 	s.cache.Delete(ctx, s.cacheKeys.Post(dl.PostID.String()))
 	return s.repository.Delete(ctx, dl.UserID.String(), dl.PostID.String())
+}
+
+func (s *FavoriteService) GetByUserID(ctx context.Context, userID string) ([]*aggregate.Post, error) {
+	cacheKey := s.cacheKeys.UserFavoritePosts(userID)
+	val, err := s.cache.Get(ctx, cacheKey)
+	if !cache.IsCacheError(err) {
+		var posts []*aggregate.Post
+		if json.Unmarshal([]byte(val), &posts) == nil {
+			return posts, nil
+		}
+	}
+
+	post, err := s.repository.FindByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(post)
+	if err == nil {
+		s.cache.Set(ctx, cacheKey, data, cache.DefaultTTL())
+	}
+
+	return post, nil
 }

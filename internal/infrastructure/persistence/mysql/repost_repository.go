@@ -18,33 +18,6 @@ func NewMySQLRepostRepository(db *sql.DB) *MySQLRepostRepository {
 	}
 }
 
-func (r *MySQLRepostRepository) getLikedStatus(ctx context.Context, postID string, userID string) (bool, error) {
-	var liked bool
-	err := r.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM likes WHERE post_id=? AND user_id=?)", postID, userID).Scan(&liked)
-	if err != nil {
-		return false, err
-	}
-	return liked, nil
-}
-
-func (r *MySQLRepostRepository) getFavoritedStatus(ctx context.Context, postID string, userID string) (bool, error) {
-	var favorited bool
-	err := r.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM favorites WHERE post_id=? AND user_id=?)", postID, userID).Scan(&favorited)
-	if err != nil {
-		return false, err
-	}
-	return favorited, nil
-}
-
-func (r *MySQLRepostRepository) getRepostedStatus(ctx context.Context, postID string, userID string) (bool, error) {
-	var reposted bool
-	err := r.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM reposts WHERE post_id=? AND user_id=?)", postID, userID).Scan(&reposted)
-	if err != nil {
-		return false, err
-	}
-	return reposted, nil
-}
-
 func (r *MySQLRepostRepository) FindByID(ctx context.Context, id string) (*entity.Repost, error) {
 	query := `SELECT id, user_id, post_id, comment, created_at, updated_at FROM reposts WHERE id = ?`
 
@@ -182,17 +155,17 @@ func (r *MySQLRepostRepository) FindByUserID(ctx context.Context, userID string)
 			return nil, err
 		}
 
-		liked, err = r.getLikedStatus(ctx, post.ID, userID)
+		liked, err = getLikedStatus(ctx, r.db, post.ID, userID)
 		if err != nil {
 			return nil, err
 		}
 
-		favorited, err = r.getFavoritedStatus(ctx, post.ID, userID)
+		favorited, err = getFavoritedStatus(ctx, r.db, post.ID, userID)
 		if err != nil {
 			return nil, err
 		}
 
-		reposted, err = r.getRepostedStatus(ctx, post.ID, userID)
+		reposted, err = getRepostedStatus(ctx, r.db, post.ID, userID)
 		if err != nil {
 			return nil, err
 		}

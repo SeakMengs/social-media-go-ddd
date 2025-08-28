@@ -37,6 +37,10 @@ func (c *cacheKeys) UserReposts(userID string) string {
 	return fmt.Sprintf("user:reposts:%s", userID)
 }
 
+func (c *cacheKeys) UserFavoritePosts(userID string) string {
+	return fmt.Sprintf("user:favorites:%s", userID)
+}
+
 // Post
 func (c *cacheKeys) Post(id string) string {
 	return fmt.Sprintf("post:%s", id)

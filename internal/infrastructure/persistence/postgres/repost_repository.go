@@ -20,33 +20,6 @@ func NewPgRepostRepository(pool *pgxpool.Pool) *PgRepostRepository {
 	}
 }
 
-func (r *PgRepostRepository) getLikedStatus(ctx context.Context, postID string, userID string) (bool, error) {
-	var liked bool
-	err := r.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM likes WHERE post_id=$1 AND user_id=$2)", postID, userID).Scan(&liked)
-	if err != nil {
-		return false, err
-	}
-	return liked, nil
-}
-
-func (r *PgRepostRepository) getFavoritedStatus(ctx context.Context, postID string, userID string) (bool, error) {
-	var favorited bool
-	err := r.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM favorites WHERE post_id=$1 AND user_id=$2)", postID, userID).Scan(&favorited)
-	if err != nil {
-		return false, err
-	}
-	return favorited, nil
-}
-
-func (r *PgRepostRepository) getRepostedStatus(ctx context.Context, postID string, userID string) (bool, error) {
-	var reposted bool
-	err := r.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM reposts WHERE post_id=$1 AND user_id=$2)", postID, userID).Scan(&reposted)
-	if err != nil {
-		return false, err
-	}
-	return reposted, nil
-}
-
 func (r *PgRepostRepository) FindByID(ctx context.Context, id string) (*entity.Repost, error) {
 	query := `SELECT id, user_id, post_id, comment, created_at, updated_at FROM reposts WHERE id = $1`
 	rows, err := r.pool.Query(ctx, query, id)
@@ -187,17 +160,17 @@ func (r *PgRepostRepository) FindByUserID(ctx context.Context, userID string) ([
 			return nil, err
 		}
 
-		liked, err = r.getLikedStatus(ctx, post.ID.String(), userID)
+		liked, err = getLikedStatus(ctx, r.pool, post.ID.String(), userID)
 		if err != nil {
 			return nil, err
 		}
 
-		favorited, err = r.getFavoritedStatus(ctx, post.ID.String(), userID)
+		favorited, err = getFavoritedStatus(ctx, r.pool, post.ID.String(), userID)
 		if err != nil {
 			return nil, err
 		}
 
-		reposted, err = r.getRepostedStatus(ctx, post.ID.String(), userID)
+		reposted, err = getRepostedStatus(ctx, r.pool, post.ID.String(), userID)
 		if err != nil {
 			return nil, err
 		}
