@@ -198,9 +198,6 @@ func (h *PostHandler) LikePost(ctx *fiber.Ctx) error {
 		}
 	}
 
-	// Invalidate cache for the post and user feed (post is already invalidated by like service)
-	h.service.post.InvalidateCacheForUserId(ctx.Context(), userId)
-
 	return SuccessResponse(ctx, nil)
 }
 
@@ -226,8 +223,6 @@ func (h *PostHandler) UnlikePost(ctx *fiber.Ctx) error {
 			return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
 		}
 	}
-
-	h.service.post.InvalidateCacheForUserId(ctx.Context(), userId)
 
 	return SuccessResponse(ctx, nil)
 }
@@ -255,8 +250,6 @@ func (h *PostHandler) FavoritePost(ctx *fiber.Ctx) error {
 		}
 	}
 
-	h.service.post.InvalidateCacheForUserId(ctx.Context(), userId)
-
 	return SuccessResponse(ctx, nil)
 }
 
@@ -282,8 +275,6 @@ func (h *PostHandler) UnfavoritePost(ctx *fiber.Ctx) error {
 			return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
 		}
 	}
-
-	h.service.post.InvalidateCacheForUserId(ctx.Context(), userId)
 
 	return SuccessResponse(ctx, nil)
 }

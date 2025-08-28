@@ -7,6 +7,7 @@ import (
 	"social-media-go-ddd/internal/domain/entity"
 	"social-media-go-ddd/internal/domain/repository"
 	"social-media-go-ddd/internal/infrastructure/cache"
+	"time"
 )
 
 type SessionService struct {
@@ -54,7 +55,8 @@ func (s *SessionService) GetByID(ctx context.Context, id string) (*entity.Sessio
 	if !session.IsExpired() {
 		data, err := json.Marshal(session)
 		if err == nil {
-			s.cache.Set(ctx, cacheKey, data, cache.DefaultTTL())
+			// cache until session expire
+			s.cache.Set(ctx, cacheKey, data, time.Until(session.ExpireAt))
 		}
 	}
 

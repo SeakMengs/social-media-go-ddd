@@ -80,24 +80,9 @@ func (s *UserService) GetByName(ctx context.Context, name string, currentUserID 
 }
 
 func (s *UserService) GetManyByName(ctx context.Context, name string, currentUserID *string) ([]*aggregate.User, error) {
-	// cacheKey := s.cacheKeys.UsersByName(name)
-	// val, err := s.cache.Get(ctx, cacheKey)
-	// if !cache.IsCacheError(err) {
-	// 	var users []*aggregate.User
-	// 	if err := json.Unmarshal([]byte(val), &users); err == nil {
-	// 		return users, nil
-	// 	}
-	// }
-
 	users, err := s.repository.SearchManyByName(ctx, name, currentUserID)
 	if err != nil {
 		return nil, err
 	}
-
-	// data, err := json.Marshal(users)
-	// if err == nil {
-	// 	s.cache.Set(ctx, cacheKey, data, cache.DefaultTTL())
-	// }
-
 	return users, nil
 }

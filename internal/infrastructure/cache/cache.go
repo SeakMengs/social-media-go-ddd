@@ -12,7 +12,7 @@ type Cache interface {
 	Get(ctx context.Context, key string) (string, error)
 	Set(ctx context.Context, key string, value any, expiration time.Duration) error
 	Delete(ctx context.Context, key string) error
-	// usage pattern could be "user:feed:%s:%d:%d" and we delete by passing "user:feed:userId:*"
+	// usage pattern could be "user:feed:%s:%d:%d" and we delete by passing "user:feed:*"
 	DeleteByPattern(ctx context.Context, pattern string) error
 	Close() error
 }
