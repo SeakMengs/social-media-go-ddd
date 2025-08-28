@@ -89,10 +89,14 @@ export function LoginForm() {
               <p className="text-sm text-red-500">{errors.password.message}</p>
             )}
           </div>
-          {(errors.username?.message || errors.password?.message) && (
+          {(errors.root?.message ||
+            errors.username?.message ||
+            errors.password?.message) && (
             <Alert variant="destructive">
               <AlertDescription>
-                {errors.username?.message || errors.password?.message}
+                {errors.root?.message ||
+                  errors.username?.message ||
+                  errors.password?.message}
               </AlertDescription>
             </Alert>
           )}

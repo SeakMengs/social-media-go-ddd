@@ -198,7 +198,10 @@ func (h *UserHandler) Login(ctx *fiber.Ctx) error {
 
 	user, err := h.service.user.GetByName(ctx.Context(), body.Username, nil)
 	if err != nil {
-		return ErrorResponse(ctx, fiber.StatusNotFound, err)
+		if errors.Is(pgx.ErrNoRows, err) || errors.Is(sql.ErrNoRows, err) {
+			return ErrorResponse(ctx, fiber.StatusNotFound, "user not found")
+		}
+		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
 	}
 
 	if !user.Password.Match(body.Password) {

@@ -76,6 +76,9 @@ export function PostCard({
   const isOwnPost = post.type === PostType.REPOST 
     ? user?.id === post.repostUser?.id  // For reposts, check if current user is the reposter
     : user?.id === post.userId;         // For regular posts, check if current user is the author
+    const repostTimeAgo = post.type === PostType.REPOST && post.repost && post.repost.createdAt
+      ? formatDistanceToNow(new Date(post.repost.createdAt), { addSuffix: true })
+      : "Unknown";
   const timeAgo = post.createdAt
     ? formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })
     : "Unknown";
@@ -219,7 +222,7 @@ export function PostCard({
               </Avatar>
               <span className="font-medium">{post.repostUser?.username}</span>
               <span>reposted</span>
-              <span>{timeAgo}</span>
+              <span>{repostTimeAgo}</span>
             </div>
             
             {/* Repost Comment */}
@@ -245,6 +248,7 @@ export function PostCard({
                       <span className="font-heading font-bold text-foreground">
                         {post.user?.username}
                       </span>
+                      <span className="text-sm text-muted-foreground">{timeAgo}</span>
                       <span className="text-sm text-muted-foreground">Original post</span>
                     </div>
                   </div>

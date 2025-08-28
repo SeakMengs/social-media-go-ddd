@@ -117,7 +117,7 @@ func (r *MySQLUserRepository) SearchManyByName(ctx context.Context, username str
 			(SELECT COUNT(*) FROM follows WHERE follower_id = users.id) AS following_count,
 			(SELECT COUNT(*) FROM follows WHERE followee_id = users.id) AS follower_count
 		FROM users
-		WHERE users.username ILIKE CONCAT(?, '%')
+		WHERE users.username LIKE CONCAT(?, '%')
 	`
 
 	rows, err := r.db.QueryContext(ctx, query, currentUserID, username)

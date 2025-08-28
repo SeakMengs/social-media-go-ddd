@@ -64,7 +64,12 @@ export function PersonalizedFeed({ auth }: PersonalizedFeedProps) {
           }
         }
         if (response.data.pagination) {
-          setPagination(response.data.pagination);
+            setPagination({
+            ...response.data.pagination,
+            hasMore:
+              response.data.pagination.page * response.data.pagination.pageSize <
+              response.data.pagination.total,
+            });
         }
       } else {
         toast.error(response.error || "Failed to load feed");

@@ -75,8 +75,8 @@ func (r *MySQLPostRepository) FindByID(ctx context.Context, id string, currentUs
 	) reposts_count ON reposts_count.post_id = posts.id
 	WHERE posts.id = ?`
 
-	var user entity.User
-	var post entity.Post
+	var user User
+	var post Post
 	var likeCount, favoriteCount, repostCount int
 	var liked, favorited, reposted bool
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
@@ -113,7 +113,17 @@ func (r *MySQLPostRepository) FindByID(ctx context.Context, id string, currentUs
 		}
 	}
 
-	return aggregate.NewPost(post, user, dto.CommonPostAggregate{
+	ePost, err := post.ToEntity()
+	if err != nil {
+		return nil, err
+	}
+
+	eUser, err := user.ToEntity()
+	if err != nil {
+		return nil, err
+	}
+
+	return aggregate.NewPost(*ePost, *eUser, dto.CommonPostAggregate{
 		LikeCount:     likeCount,
 		FavoriteCount: favoriteCount,
 		RepostCount:   repostCount,
@@ -124,7 +134,7 @@ func (r *MySQLPostRepository) FindByID(ctx context.Context, id string, currentUs
 }
 
 func (r *MySQLPostRepository) FindByUserID(ctx context.Context, userID string) ([]*aggregate.Post, error) {
-	var user entity.User
+	var user User
 	err := r.db.QueryRowContext(ctx, "SELECT id, username, email FROM users WHERE id=?", userID).
 		Scan(&user.ID, &user.Username, &user.Email)
 	if err != nil {
@@ -155,7 +165,7 @@ func (r *MySQLPostRepository) FindByUserID(ctx context.Context, userID string) (
 
 	var posts []*aggregate.Post
 	for rows.Next() {
-		var post entity.Post
+		var post Post
 		var likeCount, favoriteCount, repostCount int
 
 		if err := rows.Scan(
@@ -171,22 +181,32 @@ func (r *MySQLPostRepository) FindByUserID(ctx context.Context, userID string) (
 			return nil, err
 		}
 
-		liked, err := getLikedStatus(ctx, r.db, post.ID.String(), userID)
+		liked, err := getLikedStatus(ctx, r.db, post.ID, userID)
 		if err != nil {
 			return nil, err
 		}
 
-		favorited, err := getFavoritedStatus(ctx, r.db, post.ID.String(), userID)
+		favorited, err := getFavoritedStatus(ctx, r.db, post.ID, userID)
 		if err != nil {
 			return nil, err
 		}
 
-		reposted, err := getRepostedStatus(ctx, r.db, post.ID.String(), userID)
+		reposted, err := getRepostedStatus(ctx, r.db, post.ID, userID)
 		if err != nil {
 			return nil, err
 		}
 
-		posts = append(posts, aggregate.NewPost(post, user, dto.CommonPostAggregate{
+		ePost, err := post.ToEntity()
+		if err != nil {
+			return nil, err
+		}
+
+		eUser, err := user.ToEntity()
+		if err != nil {
+			return nil, err
+		}
+
+		posts = append(posts, aggregate.NewPost(*ePost, *eUser, dto.CommonPostAggregate{
 			LikeCount:     likeCount,
 			FavoriteCount: favoriteCount,
 			RepostCount:   repostCount,
@@ -261,7 +281,7 @@ func (r *MySQLPostRepository) FindFeed(ctx context.Context, userID string, limit
 		NULL AS repost_comment,
 		NULL AS repost_created_at,
 		NULL AS repost_updated_at,
-		posts.created_at AS feed_time  -- Use original post time for sorting
+		posts.created_at AS feed_time,  -- Use original post time for sorting
 		users.id, users.username, users.email -- post owner
 	FROM posts
 	INNER JOIN users ON posts.user_id = users.id
@@ -289,11 +309,11 @@ func (r *MySQLPostRepository) FindFeed(ctx context.Context, userID string, limit
 		reposts.comment AS repost_comment,
 		reposts.created_at AS repost_created_at,
 		reposts.updated_at AS repost_updated_at,
-		reposts.created_at AS feed_time  -- Use repost time for sorting
-	    users.id, users.username, users.email -- post owner
-		FROM reposts
-	INNER JOIN users ON users.id = posts.user_id
+		reposts.created_at AS feed_time,  -- Use repost time for sorting
+		users.id, users.username, users.email -- post owner
+	FROM reposts
 	INNER JOIN posts ON reposts.post_id = posts.id
+	INNER JOIN users ON users.id = posts.user_id
 	LEFT JOIN follows ON reposts.user_id = follows.followee_id
 	LEFT JOIN (SELECT post_id, COUNT(*) AS count FROM likes GROUP BY post_id) likes_count ON likes_count.post_id = posts.id
 	LEFT JOIN (SELECT post_id, COUNT(*) AS count FROM favorites GROUP BY post_id) favorites_count ON favorites_count.post_id = posts.id
@@ -314,6 +334,7 @@ func (r *MySQLPostRepository) FindFeed(ctx context.Context, userID string, limit
 	for rows.Next() {
 		var post Post
 		var likeCount, favoriteCount, repostCount int
+		var liked, favorited, reposted bool
 		var feedTime time.Time
 		var postUser User
 
@@ -348,10 +369,28 @@ func (r *MySQLPostRepository) FindFeed(ctx context.Context, userID string, limit
 			return nil, 0, err
 		}
 
+		liked, err = getLikedStatus(ctx, r.db, post.ID, userID)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		favorited, err = getFavoritedStatus(ctx, r.db, post.ID, userID)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		reposted, err = getRepostedStatus(ctx, r.db, post.ID, userID)
+		if err != nil {
+			return nil, 0, err
+		}
+
 		commonAggregate := dto.CommonPostAggregate{
 			LikeCount:     likeCount,
 			FavoriteCount: favoriteCount,
 			RepostCount:   repostCount,
+			Liked:         liked,
+			Favorited:     favorited,
+			Reposted:      reposted,
 		}
 
 		ePostUser, err := postUser.ToEntity()

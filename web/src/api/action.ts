@@ -298,7 +298,6 @@ export async function getMyFavoritePosts(): Promise<
 
 // Get My Feed
 export type FeedPagination = {
-  hasMore: any;
   page: number;
   pageSize: number;
   total: number;
@@ -320,6 +319,7 @@ export async function getMyFeed(params?: {
       logger.debug("Get my feed failed", response.data.error);
       return response.data;
     }
+
     const validate = z
       .object({
         feed: AggregatePostSchema.array(),
