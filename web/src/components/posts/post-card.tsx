@@ -40,6 +40,8 @@ interface PostCardProps {
   onEdit?: (post: AggregatePost) => void;
   onDelete?: (postId: string) => void;
   onPostUpdate?: (post: AggregatePost) => void;
+  onUnrepost?: (post: AggregatePost) => void;
+  onRepostCreated?: (post: AggregatePost) => void;
 }
 
 export function PostCard({
@@ -47,6 +49,8 @@ export function PostCard({
   onEdit,
   onDelete,
   onPostUpdate,
+  onUnrepost,
+  onRepostCreated,
   auth,
 }: PostCardProps) {
   const user = auth && auth.user;
@@ -58,6 +62,16 @@ export function PostCard({
   const [likeCount, setLikeCount] = useState(post.likeCount);
   const [favoriteCount, setFavoriteCount] = useState(post.favoriteCount);
   const [repostCount, setRepostCount] = useState(post.repostCount);
+
+  // Sync local state with prop changes (for updates from parent components)
+  useEffect(() => {
+    setIsLiked(post.liked);
+    setIsFavorited(post.favorited);
+    setIsReposted(post.reposted);
+    setLikeCount(post.likeCount);
+    setFavoriteCount(post.favoriteCount);
+    setRepostCount(post.repostCount);
+  }, [post.liked, post.favorited, post.reposted, post.likeCount, post.favoriteCount, post.repostCount]);
 
   const isOwnPost = post.type === PostType.REPOST 
     ? user?.id === post.repostUser?.id  // For reposts, check if current user is the reposter
@@ -71,9 +85,11 @@ export function PostCard({
     if (!user || isInteracting) return;
 
     const wasLiked = isLiked;
+    const newLikeCount = likeCount + (wasLiked ? -1 : 1);
+    
     // Optimistic update
     setIsLiked(!wasLiked);
-    setLikeCount((prev) => prev + (wasLiked ? -1 : 1));
+    setLikeCount(newLikeCount);
 
     setIsInteracting(true);
     try {
@@ -86,20 +102,20 @@ export function PostCard({
       if (!response.success) {
         // Revert optimistic update on failure
         setIsLiked(wasLiked);
-        setLikeCount((prev) => prev + (wasLiked ? 1 : -1));
+        setLikeCount(likeCount);
         toast.error(response.error || "Failed to update like");
       } else {
         // Update parent component with the new state
         onPostUpdate?.({
           ...post,
           liked: !wasLiked,
-          likeCount: likeCount + (wasLiked ? -1 : 1),
+          likeCount: newLikeCount,
         });
       }
     } catch (error) {
       // Revert optimistic update on error
       setIsLiked(wasLiked);
-      setLikeCount((prev) => prev + (wasLiked ? 1 : -1));
+      setLikeCount(likeCount);
       toast.error("An unexpected error occurred");
     } finally {
       setIsInteracting(false);
@@ -110,9 +126,11 @@ export function PostCard({
     if (!user || isInteracting) return;
 
     const wasFavorited = isFavorited;
+    const newFavoriteCount = favoriteCount + (wasFavorited ? -1 : 1);
+    
     // Optimistic update
     setIsFavorited(!wasFavorited);
-    setFavoriteCount((prev) => prev + (wasFavorited ? -1 : 1));
+    setFavoriteCount(newFavoriteCount);
 
     setIsInteracting(true);
     try {
@@ -125,20 +143,20 @@ export function PostCard({
       if (!response.success) {
         // Revert optimistic update on failure
         setIsFavorited(wasFavorited);
-        setFavoriteCount((prev) => prev + (wasFavorited ? 1 : -1));
+        setFavoriteCount(favoriteCount);
         toast.error(response.error || "Failed to update favorite");
       } else {
         // Update parent component with the new state
         onPostUpdate?.({
           ...post,
           favorited: !wasFavorited,
-          favoriteCount: favoriteCount + (wasFavorited ? -1 : 1),
+          favoriteCount: newFavoriteCount,
         });
       }
     } catch (error) {
       // Revert optimistic update on error
       setIsFavorited(wasFavorited);
-      setFavoriteCount((prev) => prev + (wasFavorited ? 1 : -1));
+      setFavoriteCount(favoriteCount);
       toast.error("An unexpected error occurred");
     } finally {
       setIsInteracting(false);
@@ -152,34 +170,33 @@ export function PostCard({
   };
 
   const handleRepostCreated = (repostedPost: AggregatePost) => {
-    // For repost creation/update, only update count if it's a new repost
-    // If it was already reposted, this is an update, so don't change the count
-    if (!isReposted) {
-      setRepostCount((prev) => prev + 1);
-      setIsReposted(true);
-      onPostUpdate?.({
-        ...post,
-        repostCount: repostCount + 1,
-        reposted: true,
-      });
-    } else {
-      // Just update the repost status for comment updates
-      setIsReposted(true);
-      onPostUpdate?.({
-        ...post,
-        reposted: true,
-      });
-    }
+    const newRepostCount = repostCount + 1;
+    setRepostCount(newRepostCount);
+    setIsReposted(true);
+    
+    const updatedPost = {
+      ...post,
+      repostCount: newRepostCount,
+      reposted: true,
+    };
+    
+    onPostUpdate?.(updatedPost);
+    onRepostCreated?.(updatedPost);
   };
 
   const handleRepostDeleted = (deletedPost: AggregatePost) => {
-    setRepostCount((prev) => prev - 1);
+    const newRepostCount = repostCount - 1;
+    setRepostCount(newRepostCount);
     setIsReposted(false);
-    onPostUpdate?.({
+    
+    const updatedPost = {
       ...post,
-      repostCount: repostCount - 1,
+      repostCount: newRepostCount,
       reposted: false,
-    });
+    };
+    
+    onPostUpdate?.(updatedPost);
+    onUnrepost?.(updatedPost);
   };
 
   const getInitials = (username: string) => {
@@ -320,7 +337,7 @@ export function PostCard({
                   <span className="text-sm text-muted-foreground">{timeAgo}</span>
                 </div>
               </div>
-              {isOwnPost && (
+              {(isOwnPost || (post.type === PostType.REPOST && user?.id === post.repostUser?.id)) && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -332,17 +349,58 @@ export function PostCard({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => onEdit?.(post)}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => onDelete?.(post.id)}
-                      className="text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
+                    {post.type === PostType.REPOST && user?.id === post.repostUser?.id ? (
+                      // Menu for user's own repost
+                      <>
+                        <DropdownMenuItem onClick={() => setShowRepostDialog(true)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Repost
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={async () => {
+                            setIsInteracting(true);
+                            try {
+                              const targetPostId = getPostId(post);
+                              const response = await unrepost(targetPostId);
+                              if (response.success) {
+                                const updatedPost = {
+                                  ...post,
+                                  reposted: false,
+                                  repostCount: repostCount - 1,
+                                };
+                                handleRepostDeleted(updatedPost);
+                                toast.success("Repost removed successfully!");
+                              } else {
+                                toast.error(response.error || "Failed to remove repost");
+                              }
+                            } catch (error) {
+                              toast.error("An unexpected error occurred");
+                            } finally {
+                              setIsInteracting(false);
+                            }
+                          }}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Remove Repost
+                        </DropdownMenuItem>
+                      </>
+                    ) : (
+                      // Menu for user's own original post
+                      <>
+                        <DropdownMenuItem onClick={() => onEdit?.(post)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => onDelete?.(post.id)}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}

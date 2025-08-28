@@ -78,31 +78,7 @@ export function RepostDialog({
         onOpenChange(false);
         setComment("");
         onRepostCreated?.(post);
-        toast.success("Post reposted successfully!");
-      } else {
-        toast.error(response.error || "Failed to repost");
-      }
-    } catch (error) {
-      toast.error("An unexpected error occurred");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleQuickRepost = async () => {
-    if (!post || !user) return;
-
-    setIsLoading(true);
-    try {
-      // For reposts, target the original post, not the repost
-      const targetPostId = getPostId(post);
-      const response = await repost(targetPostId, {
-        comment: "",
-      });
-      if (response.success) {
-        onOpenChange(false);
-        onRepostCreated?.(post);
-        toast.success("Post reposted successfully!");
+        toast.success(post.reposted ? "Repost updated successfully!" : "Post reposted successfully!");
       } else {
         toast.error(response.error || "Failed to repost");
       }
@@ -118,25 +94,19 @@ export function RepostDialog({
 
     setIsLoading(true);
     try {
-      // Since the API requires repost ID and we don't have it,
-      // we need to use the original post ID and let backend handle finding the user's repost
-      // or create a new endpoint for this purpose
       const targetPostId = getPostId(post);
-      
-      // Try using the repost endpoint with empty comment to "remove" repost
-      // This is a workaround - ideally there should be a proper unrepost endpoint
       const response = await unrepost(targetPostId);
       
       if (response.success) {
         onOpenChange(false);
+        setComment("");
         onRepostDeleted?.(post);
         toast.success("Repost removed successfully!");
       } else {
-        // If the API doesn't support this, show informative message
-        toast.error("Unrepost functionality is not available. Please refresh the page to see current status.");
+        toast.error(response.error || "Failed to remove repost");
       }
     } catch (error) {
-      toast.error("Unable to remove repost. This feature may require backend updates.");
+      toast.error("An unexpected error occurred");
     } finally {
       setIsLoading(false);
     }

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { PostCard } from "@/components/posts/post-card";
 import { Loader2, Bookmark } from "lucide-react";
 import { AuthUserResult } from "@/auth";
-import { AggregatePost } from "@/types/model";
+import { AggregatePost, PostType } from "@/types/model";
 import { getMyFavoritePosts } from "@/api/action";
 import { toast } from "sonner";
 import { getPostKey } from "@/utils/post";
@@ -44,16 +44,55 @@ export default function FavoritesPage({ auth }: FavoritesProps) {
   }, [user]);
 
   const handlePostUpdate = (updatedPost: AggregatePost) => {
+    const updatedTargetId =
+      updatedPost.type === PostType.REPOST
+        ? updatedPost.repost?.postId || updatedPost.id
+        : updatedPost.id;
+
     setFavoritePosts((prevPosts) => {
-      // If post is unfavorited, remove it from the list
+      // If post is unfavorited, remove all posts that reference the same original content
       if (!updatedPost.favorited) {
-        return prevPosts.filter((post) => post.id !== updatedPost.id);
+        return prevPosts.filter((post) => {
+          const postTargetId = post.type === PostType.REPOST && post.repost 
+            ? post.repost.postId 
+            : post.id;
+          
+          return postTargetId !== updatedTargetId;
+        });
       }
-      // Otherwise update the post if it's the exact same post
-      return prevPosts.map((post) =>
-        post.id === updatedPost.id ? updatedPost : post
-      );
+      
+      // Otherwise update interactions for all posts with the same original content
+      return prevPosts.map((post) => {
+        const postTargetId =
+          post.type === PostType.REPOST
+            ? post.repost?.postId || post.id
+            : post.id;
+
+        if (postTargetId === updatedTargetId) {
+          return {
+            ...post,
+            liked: updatedPost.liked,
+            favorited: updatedPost.favorited,
+            reposted: updatedPost.reposted,
+            likeCount: updatedPost.likeCount,
+            favoriteCount: updatedPost.favoriteCount,
+            repostCount: updatedPost.repostCount,
+          };
+        }
+        
+        return post;
+      });
     });
+  };
+
+  const handleUnrepost = (unrepostedPost: AggregatePost) => {
+    // For favorites, we don't need to remove reposts, just sync the state
+    // The handlePostUpdate will handle the interaction syncing
+  };
+
+  const handleRepostCreated = (newRepost: AggregatePost) => {
+    // For favorites, we don't need to do anything special for new reposts
+    // The handlePostUpdate will handle the interaction syncing
   };
 
   if (isLoading) {
@@ -95,6 +134,8 @@ export default function FavoritesPage({ auth }: FavoritesProps) {
                 key={getPostKey(post, i)}
                 post={post}
                 onPostUpdate={handlePostUpdate}
+                onUnrepost={handleUnrepost}
+                onRepostCreated={handleRepostCreated}
                 auth={auth}
               />
             ))}

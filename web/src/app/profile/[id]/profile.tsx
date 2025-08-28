@@ -101,63 +101,107 @@ export default function Profile({ auth }: ProfileProps) {
   };
 
   const handlePostUpdate = (updatedPost: AggregatePost) => {
-    // Update posts array
-    setPosts((prevPosts) => prevPosts.map((post) => {
-      if (post.id === updatedPost.id) {
-        return updatedPost;
-      }
-      
-      // Sync interactions for posts with same original content
-      const currentOriginalId = post.type === PostType.REPOST && post.repost 
-        ? post.repost.postId 
-        : post.id;
-      const updatedOriginalId = updatedPost.type === PostType.REPOST && updatedPost.repost 
-        ? updatedPost.repost.postId 
+    const updatedTargetId =
+      updatedPost.type === PostType.REPOST
+        ? updatedPost.repost?.postId || updatedPost.id
         : updatedPost.id;
-      
-      if (currentOriginalId === updatedOriginalId && post.id !== updatedPost.id) {
-        return {
-          ...post,
-          liked: updatedPost.liked,
-          favorited: updatedPost.favorited,
-          likeCount: updatedPost.likeCount,
-          favoriteCount: updatedPost.favoriteCount,
-          repostCount: updatedPost.repostCount,
-          // Don't change post type or structure
-        };
-      }
-      
-      return post;
-    }));
+
+    // Update posts array
+    setPosts((prevPosts) => {
+      return prevPosts.map((post) => {
+        const postTargetId =
+          post.type === PostType.REPOST
+            ? post.repost?.postId || post.id
+            : post.id;
+
+        if (postTargetId === updatedTargetId) {
+          return {
+            ...post,
+            liked: updatedPost.liked,
+            reposted: updatedPost.reposted,
+            favorited: updatedPost.favorited,
+            likeCount: updatedPost.likeCount,
+            favoriteCount: updatedPost.favoriteCount,
+            repostCount: updatedPost.repostCount,
+          };
+        }
+
+        return post;
+      });
+    });
 
     // Update reposts array
-    setReposts((prevReposts) => prevReposts.map((repost) => {
-      if (repost.id === updatedPost.id) {
-        return updatedPost;
+    setReposts((prevReposts) => {
+      return prevReposts.map((repost) => {
+        const repostTargetId =
+          repost.type === PostType.REPOST
+            ? repost.repost?.postId || repost.id
+            : repost.id;
+
+        if (repostTargetId === updatedTargetId) {
+          return {
+            ...repost,
+            liked: updatedPost.liked,
+            reposted: updatedPost.reposted,
+            favorited: updatedPost.favorited,
+            likeCount: updatedPost.likeCount,
+            favoriteCount: updatedPost.favoriteCount,
+            repostCount: updatedPost.repostCount,
+          };
+        }
+
+        return repost;
+      });
+    });
+
+    // If a new repost was created, refetch reposts to include it
+    if (updatedPost.reposted && !reposts.some(r => {
+      const targetId = r.type === PostType.REPOST && r.repost ? r.repost.postId : r.id;
+      return targetId === updatedTargetId;
+    })) {
+      // Refetch user reposts
+      const fetchUserReposts = async () => {
+        try {
+          const response = await getUserReposts(userId);
+          if (response.success) {
+            setReposts(response.data.reposts);
+          }
+        } catch (error) {
+          console.error("Failed to refetch reposts:", error);
+        }
+      };
+      fetchUserReposts();
+    }
+
+    // If a repost was removed, remove it from reposts array
+    if (!updatedPost.reposted) {
+      setReposts((prevReposts) => prevReposts.filter(repost => {
+        const targetId = repost.type === PostType.REPOST && repost.repost ? repost.repost.postId : repost.id;
+        return !(targetId === updatedTargetId && repost.type === PostType.REPOST);
+      }));
+    }
+  };
+
+  const handleUnrepost = (unrepostedPost: AggregatePost) => {
+    // Remove the unreposted item from reposts array if it's a repost
+    if (unrepostedPost.type === PostType.REPOST) {
+      setReposts((prevReposts) => prevReposts.filter(repost => repost.id !== unrepostedPost.id));
+    }
+  };
+
+  const handleRepostCreated = (newRepost: AggregatePost) => {
+    // Refetch user reposts to include the new repost
+    const fetchUserReposts = async () => {
+      try {
+        const response = await getUserReposts(userId);
+        if (response.success) {
+          setReposts(response.data.reposts);
+        }
+      } catch (error) {
+        console.error("Failed to refetch reposts:", error);
       }
-      
-      // Sync interactions for reposts with same original content
-      const currentOriginalId = repost.type === PostType.REPOST && repost.repost 
-        ? repost.repost.postId 
-        : repost.id;
-      const updatedOriginalId = updatedPost.type === PostType.REPOST && updatedPost.repost 
-        ? updatedPost.repost.postId 
-        : updatedPost.id;
-      
-      if (currentOriginalId === updatedOriginalId && repost.id !== updatedPost.id) {
-        return {
-          ...repost,
-          liked: updatedPost.liked,
-          favorited: updatedPost.favorited,
-          likeCount: updatedPost.likeCount,
-          favoriteCount: updatedPost.favoriteCount,
-          repostCount: updatedPost.repostCount,
-          // Don't change post type or structure
-        };
-      }
-      
-      return repost;
-    }));
+    };
+    fetchUserReposts();
   };
 
   if (isLoading) {
@@ -207,7 +251,7 @@ export default function Profile({ auth }: ProfileProps) {
                 </div>
               ) : posts.length > 0 ? (
                 posts.map((post, i) => (
-                  <PostCard key={getPostKey(post, i)} post={post} auth={auth} onPostUpdate={handlePostUpdate} />
+                  <PostCard key={getPostKey(post, i)} post={post} auth={auth} onPostUpdate={handlePostUpdate} onUnrepost={handleUnrepost} onRepostCreated={handleRepostCreated} />
                 ))
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
@@ -222,7 +266,7 @@ export default function Profile({ auth }: ProfileProps) {
                 </div>
               ) : reposts.length > 0 ? (
                 reposts.map((repost, i) => (
-                  <PostCard key={getPostKey(repost, i)} post={repost} auth={auth} onPostUpdate={handlePostUpdate} />
+                  <PostCard key={getPostKey(repost, i)} post={repost} auth={auth} onPostUpdate={handlePostUpdate} onUnrepost={handleUnrepost} onRepostCreated={handleRepostCreated} />
                 ))
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
