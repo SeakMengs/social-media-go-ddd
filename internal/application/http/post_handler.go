@@ -65,7 +65,7 @@ func (h *PostHandler) RegisterRoutes(app *fiber.App) {
 }
 
 func (p *PostHandler) getCurrentUserId(ctx *fiber.Ctx) *string {
-	var currentUserID string
+	var currentUserID *string = nil
 
 	// Try to read bearer token and get session/user, but it's optional
 	// Such that when getting the user, we know if we have followed that person or not yet
@@ -73,10 +73,11 @@ func (p *PostHandler) getCurrentUserId(ctx *fiber.Ctx) *string {
 	if err == nil && token != "" {
 		session, err := p.service.session.GetByID(ctx.Context(), token)
 		if err == nil && !session.IsExpired() {
-			currentUserID = session.UserID.String()
+			uid := session.UserID.String()
+			currentUserID = &uid
 		}
 	}
-	return &currentUserID
+	return currentUserID
 }
 
 func (h *PostHandler) CreatePost(ctx *fiber.Ctx) error {

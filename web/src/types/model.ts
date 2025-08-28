@@ -63,6 +63,7 @@ export const AggregatePostSchema = PostSchema.extend({
     favoriteCount: z.number(),
     favorited: z.boolean().default(false),
     liked: z.boolean().default(false),
+    reposted: z.boolean().default(false),
     type: z.enum([PostType.TEXT, PostType.REPOST]),
     repost: RepostSchema.optional(),
     user: UserSchema,

@@ -80,7 +80,7 @@ func (h *UserHandler) RegisterRoutes(app *fiber.App) {
 }
 
 func (h *UserHandler) getCurrentUserId(ctx *fiber.Ctx) *string {
-	var currentUserID string
+	var currentUserID *string = nil
 
 	// Try to read bearer token and get session/user, but it's optional
 	// Such that when getting the user, we know if we have followed that person or not yet
@@ -88,10 +88,11 @@ func (h *UserHandler) getCurrentUserId(ctx *fiber.Ctx) *string {
 	if err == nil && token != "" {
 		session, err := h.service.session.GetByID(ctx.Context(), token)
 		if err == nil && !session.IsExpired() {
-			currentUserID = session.UserID.String()
+			uid := session.UserID.String()
+			currentUserID = &uid
 		}
 	}
-	return &currentUserID
+	return currentUserID
 }
 
 func (h *UserHandler) CreateUser(ctx *fiber.Ctx) error {

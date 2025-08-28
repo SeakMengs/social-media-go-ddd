@@ -265,6 +265,36 @@ export async function getUserReposts(
     return responseSomethingWentWrong("Error getting user reposts (catch)");
   }
 }
+// Get my FavoritePosts
+export type GetMyFavoritePostsResponse = { posts: AggregatePost[] };
+export async function getMyFavoritePosts(): Promise<
+  ResponseJson<GetMyFavoritePostsResponse>
+> {
+  try {
+    const response = await apiWithAuth.get<
+      ResponseJson<GetMyFavoritePostsResponse>
+    >(`/api/v1/users/me/posts/favorites`);
+    if (!response.data.success) {
+      logger.debug("Get my favorite posts failed", response.data.error);
+      return response.data;
+    }
+    const validate = z
+      .object({
+        posts: AggregatePostSchema.array().default([]),
+      })
+      .safeParse(response.data.data);
+    if (!validate.success) {
+      logger.debug("Get my favorite posts failed", validate.error);
+      return response.data;
+    }
+    return response.data;
+  } catch (error) {
+    logger.error("Error getting my favorite posts", error);
+    return responseSomethingWentWrong(
+      "Error getting my favorite posts (catch)"
+    );
+  }
+}
 
 // Get My Feed
 export type FeedPagination = {

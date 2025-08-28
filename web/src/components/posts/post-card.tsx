@@ -22,7 +22,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { RepostDialog } from "./repost-dialog";
-import { AggregatePost, Post } from "@/types/model";
+import { AggregatePost, Post, PostType } from "@/types/model";
 import { AuthUser, AuthUserResult } from "@/auth";
 import { toast } from "sonner";
 import {
@@ -50,7 +50,7 @@ export function PostCard({
   const user = auth && auth.user;
   const [isLiked, setIsLiked] = useState(post.liked);
   const [isFavorited, setIsFavorited] = useState(post.favorited);
-  const [isReposted, setIsReposted] = useState(false);
+  const [isReposted, setIsReposted] = useState(post.reposted);
   const [showRepostDialog, setShowRepostDialog] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
   const [likeCount, setLikeCount] = useState(post.likeCount);
@@ -168,7 +168,7 @@ export function PostCard({
                   <span className="font-heading font-bold text-foreground">
                     {post.user?.username}
                   </span>
-                  {post.type === "repost" && (
+                  {post.type === PostType.REPOST && (
                     <Badge
                       variant="secondary"
                       className="text-xs bg-accent/10 text-accent border-accent/20"
@@ -210,7 +210,7 @@ export function PostCard({
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          {post.type === "repost" && post.repost ? (
+          {post.type === PostType.REPOST && post.repost ? (
             <div className="space-y-4">
               {post.repost.comment && (
                 <p className="text-foreground leading-relaxed text-pretty">
