@@ -495,7 +495,7 @@ export async function repost(
 export async function unrepost(id: string): Promise<ResponseJson<{}>> {
   try {
     const response = await apiWithAuth.delete<ResponseJson<{}>>(
-      `/api/v1/reposts/${id}`
+      `/api/v1/posts/${id}/repost`
     );
     return response.data;
   } catch (error) {

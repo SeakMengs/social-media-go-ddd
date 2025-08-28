@@ -6,11 +6,11 @@ import { UserProfileCard } from "@/components/users/user-profile-card";
 import { PostCard } from "@/components/posts/post-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
-import { AggregatePost, AggregateUser } from "@/types/model";
+import { AggregatePost, AggregateUser, PostType } from "@/types/model";
 import { AuthUserResult } from "@/auth";
 import { getUserById, getUserPosts, getUserReposts } from "@/api/action";
+import { getPostKey } from "@/utils/post";
 import { toast } from "sonner";
-import { getPostKey } from "@/utils/key";
 
 type ProfileProps = {
   auth: AuthUserResult;
@@ -100,6 +100,66 @@ export default function Profile({ auth }: ProfileProps) {
     }
   };
 
+  const handlePostUpdate = (updatedPost: AggregatePost) => {
+    // Update posts array
+    setPosts((prevPosts) => prevPosts.map((post) => {
+      if (post.id === updatedPost.id) {
+        return updatedPost;
+      }
+      
+      // Sync interactions for posts with same original content
+      const currentOriginalId = post.type === PostType.REPOST && post.repost 
+        ? post.repost.postId 
+        : post.id;
+      const updatedOriginalId = updatedPost.type === PostType.REPOST && updatedPost.repost 
+        ? updatedPost.repost.postId 
+        : updatedPost.id;
+      
+      if (currentOriginalId === updatedOriginalId && post.id !== updatedPost.id) {
+        return {
+          ...post,
+          liked: updatedPost.liked,
+          favorited: updatedPost.favorited,
+          likeCount: updatedPost.likeCount,
+          favoriteCount: updatedPost.favoriteCount,
+          repostCount: updatedPost.repostCount,
+          // Don't change post type or structure
+        };
+      }
+      
+      return post;
+    }));
+
+    // Update reposts array
+    setReposts((prevReposts) => prevReposts.map((repost) => {
+      if (repost.id === updatedPost.id) {
+        return updatedPost;
+      }
+      
+      // Sync interactions for reposts with same original content
+      const currentOriginalId = repost.type === PostType.REPOST && repost.repost 
+        ? repost.repost.postId 
+        : repost.id;
+      const updatedOriginalId = updatedPost.type === PostType.REPOST && updatedPost.repost 
+        ? updatedPost.repost.postId 
+        : updatedPost.id;
+      
+      if (currentOriginalId === updatedOriginalId && repost.id !== updatedPost.id) {
+        return {
+          ...repost,
+          liked: updatedPost.liked,
+          favorited: updatedPost.favorited,
+          likeCount: updatedPost.likeCount,
+          favoriteCount: updatedPost.favoriteCount,
+          repostCount: updatedPost.repostCount,
+          // Don't change post type or structure
+        };
+      }
+      
+      return repost;
+    }));
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -146,8 +206,8 @@ export default function Profile({ auth }: ProfileProps) {
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
               ) : posts.length > 0 ? (
-                posts.map((post) => (
-                  <PostCard key={getPostKey(post)} post={post} auth={auth} />
+                posts.map((post, i) => (
+                  <PostCard key={getPostKey(post, i)} post={post} auth={auth} onPostUpdate={handlePostUpdate} />
                 ))
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
@@ -161,8 +221,8 @@ export default function Profile({ auth }: ProfileProps) {
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
               ) : reposts.length > 0 ? (
-                reposts.map((repost) => (
-                  <PostCard key={getPostKey(repost)} post={repost} auth={auth} />
+                reposts.map((repost, i) => (
+                  <PostCard key={getPostKey(repost, i)} post={repost} auth={auth} onPostUpdate={handlePostUpdate} />
                 ))
               ) : (
                 <div className="text-center py-8 text-muted-foreground">

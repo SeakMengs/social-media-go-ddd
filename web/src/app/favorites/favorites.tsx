@@ -8,6 +8,7 @@ import { AuthUserResult } from "@/auth";
 import { AggregatePost } from "@/types/model";
 import { getMyFavoritePosts } from "@/api/action";
 import { toast } from "sonner";
+import { getPostKey } from "@/utils/post";
 
 type FavoritesProps = {
   auth: AuthUserResult;
@@ -48,7 +49,7 @@ export default function FavoritesPage({ auth }: FavoritesProps) {
       if (!updatedPost.favorited) {
         return prevPosts.filter((post) => post.id !== updatedPost.id);
       }
-      // Otherwise update the post
+      // Otherwise update the post if it's the exact same post
       return prevPosts.map((post) =>
         post.id === updatedPost.id ? updatedPost : post
       );
@@ -89,9 +90,9 @@ export default function FavoritesPage({ auth }: FavoritesProps) {
 
         {favoritePosts.length > 0 ? (
           <div className="space-y-4">
-            {favoritePosts.map((post) => (
+            {favoritePosts.map((post, i) => (
               <PostCard
-                key={post.id}
+                key={getPostKey(post, i)}
                 post={post}
                 onPostUpdate={handlePostUpdate}
                 auth={auth}

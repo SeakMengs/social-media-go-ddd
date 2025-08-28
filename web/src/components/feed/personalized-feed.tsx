@@ -20,7 +20,7 @@ import { AggregatePost, PostType } from "@/types/model"
 import { AuthUser } from "@/auth"
 import { deletePost, getMyFeed } from "@/api/action"
 import { toast } from "sonner"
-import { getPostKey } from "@/utils/key"
+import { getPostKey } from "@/utils/post"
 
 type PersonalizedFeedProps = {
   auth: AuthUser
@@ -128,7 +128,38 @@ export function PersonalizedFeed({ auth }: PersonalizedFeedProps) {
   }
 
   const handlePostUpdate = (updatedPost: AggregatePost) => {
-    setPosts((prevPosts) => prevPosts.map((post) => (post.id === updatedPost.id ? updatedPost : post)))
+    setPosts((prevPosts) => prevPosts.map((post) => {
+      // Check if this is the exact same post instance
+      if (post.id === updatedPost.id) {
+        return updatedPost;
+      }
+      
+      // For interaction synchronization: update other instances of the same original post
+      // But only sync interaction counts and states, not the entire post
+      const currentOriginalId = post.type === PostType.REPOST && post.repost 
+        ? post.repost.postId 
+        : post.id;
+      const updatedOriginalId = updatedPost.type === PostType.REPOST && updatedPost.repost 
+        ? updatedPost.repost.postId 
+        : updatedPost.id;
+      
+      // If they share the same original post content, sync only interaction data
+      // But be careful not to change the post type or structure
+      if (currentOriginalId === updatedOriginalId && post.id !== updatedPost.id) {
+        return {
+          ...post,
+          liked: updatedPost.liked,
+          favorited: updatedPost.favorited,
+          likeCount: updatedPost.likeCount,
+          favoriteCount: updatedPost.favoriteCount,
+          repostCount: updatedPost.repostCount,
+          // Don't sync 'reposted' state as it's user-specific per post instance
+          // Don't change post type or structure
+        };
+      }
+      
+      return post;
+    }));
   }
 
   if (isLoading) {
@@ -161,9 +192,9 @@ export function PersonalizedFeed({ auth }: PersonalizedFeedProps) {
       <CreatePost onPostCreated={handlePostCreated} auth={auth} />
 
       <div className="space-y-4">
-        {posts.map((post) => (
+        {posts.map((post, i) => (
           <PostCard
-            key={getPostKey(post)}
+            key={getPostKey(post, i)}
             auth={auth}
             post={post}
             onEdit={handleEdit}
@@ -190,7 +221,7 @@ export function PersonalizedFeed({ auth }: PersonalizedFeedProps) {
               Follow some users to see their posts in your personalized feed, or create your first post!
             </p>
             <Button asChild>
-              <a href="/discover">Discover People</a>
+              <a href="/search">Search People</a>
             </Button>
           </div>
         </div>

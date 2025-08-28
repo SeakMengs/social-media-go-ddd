@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -16,10 +16,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, Repeat2 } from "lucide-react";
-import { AggregatePost } from "@/types/model";
+import { AggregatePost, PostType } from "@/types/model";
 import { AuthUser } from "@/auth";
-import { repost } from "@/api/action";
+import { repost, unrepost } from "@/api/action";
 import { toast } from "sonner";
+import { getPostId } from "@/utils/post";
 
 interface RepostDialogProps {
   auth: AuthUser;
@@ -27,6 +28,7 @@ interface RepostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRepostCreated?: (post: AggregatePost) => void;
+  onRepostDeleted?: (post: AggregatePost) => void;
 }
 
 export function RepostDialog({
@@ -35,10 +37,27 @@ export function RepostDialog({
   open,
   onOpenChange,
   onRepostCreated,
+  onRepostDeleted,
 }: RepostDialogProps) {
   const [comment, setComment] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { user } = auth;
+
+  // Set default comment when dialog opens for updating a repost
+  useEffect(() => {
+    if (open && post?.reposted) {
+      // If this is a repost being viewed and user has reposted it, get the comment
+      if (post.type === PostType.REPOST && post.repost?.comment) {
+        setComment(post.repost.comment);
+      } else {
+        // For regular posts that user has reposted, we don't have the comment here
+        // The backend should provide this when opening the dialog
+        setComment("");
+      }
+    } else if (open) {
+      setComment("");
+    }
+  }, [post, open]);
 
   const getInitials = (username: string) => {
     return username.slice(0, 2).toUpperCase();
@@ -50,7 +69,9 @@ export function RepostDialog({
 
     setIsLoading(true);
     try {
-      const response = await repost(post.id, {
+      // For reposts, target the original post, not the repost
+      const targetPostId = getPostId(post);
+      const response = await repost(targetPostId, {
         comment: comment.trim(),
       });
       if (response.success) {
@@ -73,7 +94,9 @@ export function RepostDialog({
 
     setIsLoading(true);
     try {
-      const response = await repost(post.id, {
+      // For reposts, target the original post, not the repost
+      const targetPostId = getPostId(post);
+      const response = await repost(targetPostId, {
         comment: "",
       });
       if (response.success) {
@@ -90,6 +113,35 @@ export function RepostDialog({
     }
   };
 
+  const handleUnrepost = async () => {
+    if (!post || !user) return;
+
+    setIsLoading(true);
+    try {
+      // Since the API requires repost ID and we don't have it,
+      // we need to use the original post ID and let backend handle finding the user's repost
+      // or create a new endpoint for this purpose
+      const targetPostId = getPostId(post);
+      
+      // Try using the repost endpoint with empty comment to "remove" repost
+      // This is a workaround - ideally there should be a proper unrepost endpoint
+      const response = await unrepost(targetPostId);
+      
+      if (response.success) {
+        onOpenChange(false);
+        onRepostDeleted?.(post);
+        toast.success("Repost removed successfully!");
+      } else {
+        // If the API doesn't support this, show informative message
+        toast.error("Unrepost functionality is not available. Please refresh the page to see current status.");
+      }
+    } catch (error) {
+      toast.error("Unable to remove repost. This feature may require backend updates.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (!post || !user) return null;
 
   return (
@@ -98,10 +150,13 @@ export function RepostDialog({
         <DialogHeader>
           <DialogTitle className="font-heading flex items-center gap-2">
             <Repeat2 className="h-5 w-5" />
-            Repost
+            {post.reposted ? "Update Repost" : "Repost"}
           </DialogTitle>
           <DialogDescription>
-            Add your thoughts or repost as-is
+            {post.reposted 
+              ? "Update your repost comment or remove your repost."
+              : "Add your thoughts or repost as-is"
+            }
           </DialogDescription>
         </DialogHeader>
 
@@ -151,18 +206,20 @@ export function RepostDialog({
           >
             Cancel
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleQuickRepost}
-            disabled={isLoading}
-          >
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Repost
-          </Button>
+          {post.reposted && (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleUnrepost}
+              disabled={isLoading}
+            >
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Remove Repost
+            </Button>
+          )}
           <Button onClick={handleSubmit} disabled={isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Repost with comment
+            {post.reposted ? "Update Repost" : "Repost"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -30,7 +30,9 @@ import {
   likePost,
   unfavoritePost,
   unlikePost,
+  unrepost,
 } from "@/api/action";
+import { getPostId } from "@/utils/post";
 
 interface PostCardProps {
   auth: AuthUserResult;
@@ -57,7 +59,9 @@ export function PostCard({
   const [favoriteCount, setFavoriteCount] = useState(post.favoriteCount);
   const [repostCount, setRepostCount] = useState(post.repostCount);
 
-  const isOwnPost = user?.id === post.userId;
+  const isOwnPost = post.type === PostType.REPOST 
+    ? user?.id === post.repostUser?.id  // For reposts, check if current user is the reposter
+    : user?.id === post.userId;         // For regular posts, check if current user is the author
   const timeAgo = post.createdAt
     ? formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })
     : "Unknown";
@@ -73,9 +77,11 @@ export function PostCard({
 
     setIsInteracting(true);
     try {
+      // For reposts, interact with the original post, not the repost
+      const targetPostId = getPostId(post);
       const response = wasLiked
-        ? await unlikePost(post.id)
-        : await likePost(post.id);
+        ? await unlikePost(targetPostId)
+        : await likePost(targetPostId);
       console.log(`like/unlike response: `, response);
       if (!response.success) {
         // Revert optimistic update on failure
@@ -83,9 +89,10 @@ export function PostCard({
         setLikeCount((prev) => prev + (wasLiked ? 1 : -1));
         toast.error(response.error || "Failed to update like");
       } else {
-        // Update parent component if needed
+        // Update parent component with the new state
         onPostUpdate?.({
           ...post,
+          liked: !wasLiked,
           likeCount: likeCount + (wasLiked ? -1 : 1),
         });
       }
@@ -99,7 +106,7 @@ export function PostCard({
     }
   };
 
-  const handleFavorite = async () => {
+    const handleFavorite = async () => {
     if (!user || isInteracting) return;
 
     const wasFavorited = isFavorited;
@@ -109,9 +116,11 @@ export function PostCard({
 
     setIsInteracting(true);
     try {
+      // For reposts, interact with the original post, not the repost
+      const targetPostId = getPostId(post);
       const response = wasFavorited
-        ? await unfavoritePost(post.id)
-        : await favoritePost(post.id);
+        ? await unfavoritePost(targetPostId)
+        : await favoritePost(targetPostId);
 
       if (!response.success) {
         // Revert optimistic update on failure
@@ -119,9 +128,10 @@ export function PostCard({
         setFavoriteCount((prev) => prev + (wasFavorited ? 1 : -1));
         toast.error(response.error || "Failed to update favorite");
       } else {
-        // Update parent component if needed
+        // Update parent component with the new state
         onPostUpdate?.({
           ...post,
+          favorited: !wasFavorited,
           favoriteCount: favoriteCount + (wasFavorited ? -1 : 1),
         });
       }
@@ -135,16 +145,40 @@ export function PostCard({
     }
   };
 
-  const handleRepost = () => {
+  const handleRepost = async () => {
     if (!user || isInteracting) return;
+    
     setShowRepostDialog(true);
   };
 
-  const handleRepostCreated = (repostedPost: Post) => {
-    setRepostCount((prev) => prev + 1);
+  const handleRepostCreated = (repostedPost: AggregatePost) => {
+    // For repost creation/update, only update count if it's a new repost
+    // If it was already reposted, this is an update, so don't change the count
+    if (!isReposted) {
+      setRepostCount((prev) => prev + 1);
+      setIsReposted(true);
+      onPostUpdate?.({
+        ...post,
+        repostCount: repostCount + 1,
+        reposted: true,
+      });
+    } else {
+      // Just update the repost status for comment updates
+      setIsReposted(true);
+      onPostUpdate?.({
+        ...post,
+        reposted: true,
+      });
+    }
+  };
+
+  const handleRepostDeleted = (deletedPost: AggregatePost) => {
+    setRepostCount((prev) => prev - 1);
+    setIsReposted(false);
     onPostUpdate?.({
       ...post,
-      repostCount: repostCount + 1,
+      repostCount: repostCount - 1,
+      reposted: false,
     });
   };
 
@@ -154,157 +188,234 @@ export function PostCard({
 
   return (
     <>
-      <Card className="w-full shadow-sm hover:shadow-md transition-shadow duration-200">
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <Avatar className="h-12 w-12 ring-2 ring-accent/20">
-                <AvatarFallback className="bg-accent text-accent-foreground font-semibold">
-                  {getInitials(post.user?.username || "U")}
+      {post.type === PostType.REPOST && post.repost ? (
+        // Repost Layout - Different structure to make it clear this is a repost
+        <Card className="w-full shadow-sm hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 space-y-3">
+            {/* Repost Header */}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Repeat2 className="h-4 w-4" />
+              <Avatar className="h-6 w-6">
+                <AvatarFallback className="bg-accent text-accent-foreground text-xs">
+                  {getInitials(post.repostUser?.username || "U")}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                  <span className="font-heading font-bold text-foreground">
-                    {post.user?.username}
-                  </span>
-                  {post.type === PostType.REPOST && (
-                    <Badge
-                      variant="secondary"
-                      className="text-xs bg-accent/10 text-accent border-accent/20"
-                    >
-                      <Repeat2 className="h-3 w-3 mr-1" />
-                      Reposted
-                    </Badge>
-                  )}
-                </div>
-                <span className="text-sm text-muted-foreground">{timeAgo}</span>
-              </div>
+              <span className="font-medium">{post.repostUser?.username}</span>
+              <span>reposted</span>
+              <span>{timeAgo}</span>
             </div>
-            {isOwnPost && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 hover:bg-muted"
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => onEdit?.(post)}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => onDelete?.(post.id)}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {post.type === PostType.REPOST && post.repost ? (
-            <div className="space-y-4">
-              {post.repost.comment && (
+            
+            {/* Repost Comment */}
+            {post.repost.comment && (
+              <div className="pl-6">
                 <p className="text-foreground leading-relaxed text-pretty">
                   {post.repost.comment}
                 </p>
-              )}
-              {post.user && (
-                <Card className="border-l-4 border-l-accent bg-card/50 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Avatar className="h-6 w-6">
-                        <AvatarFallback className="bg-accent text-accent-foreground text-xs">
-                          {getInitials(post.user?.username || "U")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm font-semibold">
+              </div>
+            )}
+            
+            {/* Original Post Card */}
+            <Card className="shadow-sm border-l-4 border-l-accent bg-card/50 ml-6">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10 ring-2 ring-accent/20">
+                      <AvatarFallback className="bg-accent text-accent-foreground font-semibold">
+                        {getInitials(post.user?.username || "U")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col">
+                      <span className="font-heading font-bold text-foreground">
                         {post.user?.username}
                       </span>
+                      <span className="text-sm text-muted-foreground">Original post</span>
                     </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed text-pretty">
-                      {post.content}
-                    </p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <p className="text-foreground leading-relaxed text-pretty text-base mb-4">
+                  {post.content}
+                </p>
+                
+                {user && (
+                  <div className="flex items-center justify-between pt-4 border-t border-border">
+                    <div className="flex items-center gap-8">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleLike}
+                        disabled={isInteracting}
+                        className={cn(
+                          "gap-2 text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-all duration-200 rounded-full px-3",
+                          isLiked && "text-red-500 bg-red-50"
+                        )}
+                      >
+                        <Heart
+                          className={cn(
+                            "h-4 w-4 transition-all",
+                            isLiked && "fill-current scale-110"
+                          )}
+                        />
+                        <span className="text-sm font-medium">{likeCount}</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRepost}
+                        disabled={isInteracting}
+                        className={cn(
+                          "gap-2 text-muted-foreground hover:text-green-500 hover:bg-green-50 transition-all duration-200 rounded-full px-3",
+                          isReposted && "text-green-500 bg-green-50"
+                        )}
+                      >
+                        <Repeat2
+                          className={cn(
+                            "h-4 w-4 transition-all",
+                            isReposted && "scale-110"
+                          )}
+                        />
+                        <span className="text-sm font-medium">{repostCount}</span>
+                      </Button>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleFavorite}
+                      disabled={isInteracting}
+                      className={cn(
+                        "gap-2 text-muted-foreground hover:text-yellow-500 hover:bg-yellow-50 transition-all duration-200 rounded-full px-3",
+                        isFavorited && "text-yellow-500 bg-yellow-50"
+                      )}
+                    >
+                      <Bookmark
+                        className={cn(
+                          "h-4 w-4 transition-all",
+                          isFavorited && "fill-current scale-110"
+                        )}
+                      />
+                      <span className="text-sm font-medium">{favoriteCount}</span>
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </CardContent>
+        </Card>
+      ) : (
+        // Regular Post Layout
+        <Card className="w-full shadow-sm hover:shadow-md transition-shadow duration-200">
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-12 w-12 ring-2 ring-accent/20">
+                  <AvatarFallback className="bg-accent text-accent-foreground font-semibold">
+                    {getInitials(post.user?.username || "U")}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col">
+                  <span className="font-heading font-bold text-foreground">
+                    {post.user?.username}
+                  </span>
+                  <span className="text-sm text-muted-foreground">{timeAgo}</span>
+                </div>
+              </div>
+              {isOwnPost && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 hover:bg-muted"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => onEdit?.(post)}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => onDelete?.(post.id)}
+                      className="text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
-          ) : (
+          </CardHeader>
+          <CardContent className="pt-0">
             <p className="text-foreground leading-relaxed text-pretty text-base">
               {post.content}
             </p>
-          )}
 
-          {user && (
-            <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
-              <div className="flex items-center gap-8">
+            {user && (
+              <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
+                <div className="flex items-center gap-8">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleLike}
+                    disabled={isInteracting}
+                    className={cn(
+                      "gap-2 text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-all duration-200 rounded-full px-3",
+                      isLiked && "text-red-500 bg-red-50"
+                    )}
+                  >
+                    <Heart
+                      className={cn(
+                        "h-4 w-4 transition-all",
+                        isLiked && "fill-current scale-110"
+                      )}
+                    />
+                    <span className="text-sm font-medium">{likeCount}</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRepost}
+                    disabled={isInteracting}
+                    className={cn(
+                      "gap-2 text-muted-foreground hover:text-green-500 hover:bg-green-50 transition-all duration-200 rounded-full px-3",
+                      isReposted && "text-green-500 bg-green-50"
+                    )}
+                  >
+                    <Repeat2
+                      className={cn(
+                        "h-4 w-4 transition-all",
+                        isReposted && "scale-110"
+                      )}
+                    />
+                    <span className="text-sm font-medium">{repostCount}</span>
+                  </Button>
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleLike}
+                  onClick={handleFavorite}
                   disabled={isInteracting}
                   className={cn(
-                    "gap-2 text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-all duration-200 rounded-full px-3",
-                    isLiked && "text-red-500 bg-red-50"
+                    "gap-2 text-muted-foreground hover:text-yellow-500 hover:bg-yellow-50 transition-all duration-200 rounded-full px-3",
+                    isFavorited && "text-yellow-500 bg-yellow-50"
                   )}
                 >
-                  <Heart
+                  <Bookmark
                     className={cn(
                       "h-4 w-4 transition-all",
-                      isLiked && "fill-current scale-110"
+                      isFavorited && "fill-current scale-110"
                     )}
                   />
-                  <span className="text-sm font-medium">{likeCount}</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleRepost}
-                  disabled={isInteracting}
-                  className={cn(
-                    "gap-2 text-muted-foreground hover:text-green-500 hover:bg-green-50 transition-all duration-200 rounded-full px-3",
-                    isReposted && "text-green-500 bg-green-50"
-                  )}
-                >
-                  <Repeat2
-                    className={cn(
-                      "h-4 w-4 transition-all",
-                      isReposted && "scale-110"
-                    )}
-                  />
-                  <span className="text-sm font-medium">{repostCount}</span>
+                  <span className="text-sm font-medium">{favoriteCount}</span>
                 </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleFavorite}
-                disabled={isInteracting}
-                className={cn(
-                  "gap-2 text-muted-foreground hover:text-yellow-500 hover:bg-yellow-50 transition-all duration-200 rounded-full px-3",
-                  isFavorited && "text-yellow-500 bg-yellow-50"
-                )}
-              >
-                <Bookmark
-                  className={cn(
-                    "h-4 w-4 transition-all",
-                    isFavorited && "fill-current scale-110"
-                  )}
-                />
-                <span className="text-sm font-medium">{favoriteCount}</span>
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {auth && (
         <RepostDialog
@@ -313,6 +424,7 @@ export function PostCard({
           open={showRepostDialog}
           onOpenChange={setShowRepostDialog}
           onRepostCreated={handleRepostCreated}
+          onRepostDeleted={handleRepostDeleted}
         />
       )}
     </>
