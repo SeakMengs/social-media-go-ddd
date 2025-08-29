@@ -1,7 +1,16 @@
 package valueobject
 
-const (
-	ErrPwMaxLength = "password length must not exceed %d character"
-	ErrPwMinLength = "password length must at least be %d character long"
-	ErrPwEmpty     = "password must not be empty"
+import (
+	"errors"
+	"strconv"
 )
+
+func ErrPwMaxLength(max int) error {
+	return errors.New("password length must not exceed " + strconv.Itoa(max) + " character")
+}
+
+func ErrPwMinLength(min int) error {
+	return errors.New("password length must at least be " + strconv.Itoa(min) + " character long")
+}
+
+var ErrPwEmpty = errors.New("password must not be empty")

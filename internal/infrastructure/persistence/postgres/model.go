@@ -135,7 +135,7 @@ func (r *Repost) ToEntity() (*entity.Repost, error) {
 
 type Session struct {
 	BaseModel
-	UserID   pgtype.Text        `db:"user_id"`
+	UserID   pgtype.UUID        `db:"user_id"`
 	ExpireAt pgtype.Timestamptz `db:"expire_at"`
 }
 
@@ -143,17 +143,13 @@ func (s *Session) ToEntity() (*entity.Session, error) {
 	if s == nil {
 		return nil, nil
 	}
-	userID, err := entity.StringToUUID(s.UserID.String)
-	if err != nil {
-		return nil, err
-	}
 	baseEntity, err := s.BaseModel.ToEntity()
 	if err != nil {
 		return nil, err
 	}
 	return &entity.Session{
 		BaseEntity: baseEntity,
-		UserID:     userID,
+		UserID:     s.UserID.Bytes,
 		ExpireAt:   s.ExpireAt.Time,
 	}, nil
 }

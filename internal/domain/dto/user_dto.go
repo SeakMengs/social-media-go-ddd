@@ -14,7 +14,7 @@ type (
 
 	CommonUserAggregate struct {
 		Followed       bool `json:"followed"`
-		FollowerCount  int  `json:"follower_count"`
-		FollowingCount int  `json:"following_count"`
+		FollowerCount  int  `json:"followerCount"`
+		FollowingCount int  `json:"followingCount"`
 	}
 )

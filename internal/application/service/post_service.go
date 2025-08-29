@@ -38,7 +38,7 @@ func (s *PostService) GetByID(ctx context.Context, id string, currentUserID *str
 	val, err := s.cache.Get(ctx, cacheKey)
 	if !cache.IsCacheError(err) {
 		var post aggregate.Post
-		if json.Unmarshal([]byte(val), &post) == nil {
+		if err := json.Unmarshal([]byte(val), &post); err == nil {
 			return &post, nil
 		}
 	}

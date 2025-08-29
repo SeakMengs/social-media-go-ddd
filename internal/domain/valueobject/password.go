@@ -1,7 +1,6 @@
 package valueobject
 
 import (
-	"fmt"
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
@@ -18,13 +17,13 @@ type Password struct {
 
 func NewPassword(plain string) (Password, error) {
 	if strings.TrimSpace(plain) == "" {
-		return Password{}, fmt.Errorf(ErrPwEmpty)
+		return Password{}, ErrPwEmpty
 	}
 	if len(plain) < PwMinLength {
-		return Password{}, fmt.Errorf(ErrPwMinLength, PwMinLength)
+		return Password{}, ErrPwMinLength(PwMinLength)
 	}
 	if len(plain) > PwMaxLength {
-		return Password{}, fmt.Errorf(ErrPwMaxLength, PwMaxLength)
+		return Password{}, ErrPwMaxLength(PwMaxLength)
 	}
 
 	bytes, err := bcrypt.GenerateFromPassword([]byte(plain), bcrypt.DefaultCost)
