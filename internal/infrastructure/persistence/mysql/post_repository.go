@@ -27,33 +27,6 @@ func (r *MySQLPostRepository) Save(ctx context.Context, p *entity.Post) error {
 	return err
 }
 
-func getLikedStatus(ctx context.Context, db *sql.DB, postID string, userID string) (bool, error) {
-	var liked bool
-	err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM likes WHERE post_id=? AND user_id=?)", postID, userID).Scan(&liked)
-	if err != nil {
-		return false, err
-	}
-	return liked, nil
-}
-
-func getFavoritedStatus(ctx context.Context, db *sql.DB, postID string, userID string) (bool, error) {
-	var favorited bool
-	err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM favorites WHERE post_id=? AND user_id=?)", postID, userID).Scan(&favorited)
-	if err != nil {
-		return false, err
-	}
-	return favorited, nil
-}
-
-func getRepostedStatus(ctx context.Context, db *sql.DB, postID string, userID string) (bool, error) {
-	var reposted bool
-	err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM reposts WHERE post_id=? AND user_id=?)", postID, userID).Scan(&reposted)
-	if err != nil {
-		return false, err
-	}
-	return reposted, nil
-}
-
 func (r *MySQLPostRepository) FindByID(ctx context.Context, id string, currentUserID *string) (*aggregate.Post, error) {
 	query := `SELECT posts.id, posts.user_id, posts.content, posts.created_at, posts.updated_at,
 		COALESCE(likes_count.count, 0) AS like_count,
@@ -61,7 +34,11 @@ func (r *MySQLPostRepository) FindByID(ctx context.Context, id string, currentUs
 		COALESCE(reposts_count.count, 0) AS repost_count,
 		 users.id,
        users.username,
-       users.email
+       users.email,
+	   -- Check if the current user has liked, favorited, or reposted the post
+	   EXISTS (SELECT 1 FROM likes l WHERE l.post_id = posts.id AND l.user_id = ?) AS liked,
+	   EXISTS (SELECT 1 FROM favorites f WHERE f.post_id = posts.id AND f.user_id = ?) AS favorited,
+	   EXISTS (SELECT 1 FROM reposts r WHERE r.post_id = posts.id AND r.user_id = ?) AS reposted
 	FROM posts
 	INNER JOIN users ON posts.user_id = users.id
 	LEFT JOIN (
@@ -79,7 +56,7 @@ func (r *MySQLPostRepository) FindByID(ctx context.Context, id string, currentUs
 	var post Post
 	var likeCount, favoriteCount, repostCount int
 	var liked, favorited, reposted bool
-	err := r.db.QueryRowContext(ctx, query, id).Scan(
+	err := r.db.QueryRowContext(ctx, query, currentUserID, currentUserID, currentUserID, id).Scan(
 		&post.ID,
 		&post.UserID,
 		&post.Content,
@@ -91,26 +68,12 @@ func (r *MySQLPostRepository) FindByID(ctx context.Context, id string, currentUs
 		&user.ID,
 		&user.Username,
 		&user.Email,
+		&liked,
+		&favorited,
+		&reposted,
 	)
 	if err != nil {
 		return nil, err
-	}
-
-	if currentUserID != nil {
-		liked, err = getLikedStatus(ctx, r.db, id, *currentUserID)
-		if err != nil {
-			return nil, err
-		}
-
-		favorited, err = getFavoritedStatus(ctx, r.db, id, *currentUserID)
-		if err != nil {
-			return nil, err
-		}
-
-		reposted, err = getRepostedStatus(ctx, r.db, id, *currentUserID)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	ePost, err := post.ToEntity()
@@ -144,7 +107,11 @@ func (r *MySQLPostRepository) FindByUserID(ctx context.Context, userID string) (
 	query := `SELECT posts.id, posts.user_id, posts.content, posts.created_at, posts.updated_at,
 		COALESCE(likes_count.count, 0) AS like_count,
 		COALESCE(favorites_count.count, 0) AS favorite_count,
-		COALESCE(reposts_count.count, 0) AS repost_count
+		COALESCE(reposts_count.count, 0) AS repost_count,
+		-- Check if the current user has liked, favorited, or reposted the post
+		EXISTS (SELECT 1 FROM likes l WHERE l.post_id = posts.id AND l.user_id = ?) AS liked,
+		EXISTS (SELECT 1 FROM favorites f WHERE f.post_id = posts.id AND f.user_id = ?) AS favorited,
+		EXISTS (SELECT 1 FROM reposts r WHERE r.post_id = posts.id AND r.user_id = ?) AS reposted
 	FROM posts
 	LEFT JOIN (
 		SELECT post_id, COUNT(*) AS count FROM likes GROUP BY post_id
@@ -157,7 +124,7 @@ func (r *MySQLPostRepository) FindByUserID(ctx context.Context, userID string) (
 	) reposts_count ON reposts_count.post_id = posts.id
 	WHERE posts.user_id = ?`
 
-	rows, err := r.db.QueryContext(ctx, query, userID)
+	rows, err := r.db.QueryContext(ctx, query, userID, userID, userID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -166,6 +133,7 @@ func (r *MySQLPostRepository) FindByUserID(ctx context.Context, userID string) (
 	var posts []*aggregate.Post
 	for rows.Next() {
 		var post Post
+		var liked, favorited, reposted bool
 		var likeCount, favoriteCount, repostCount int
 
 		if err := rows.Scan(
@@ -177,22 +145,10 @@ func (r *MySQLPostRepository) FindByUserID(ctx context.Context, userID string) (
 			&likeCount,
 			&favoriteCount,
 			&repostCount,
+			&liked,
+			&favorited,
+			&reposted,
 		); err != nil {
-			return nil, err
-		}
-
-		liked, err := getLikedStatus(ctx, r.db, post.ID, userID)
-		if err != nil {
-			return nil, err
-		}
-
-		favorited, err := getFavoritedStatus(ctx, r.db, post.ID, userID)
-		if err != nil {
-			return nil, err
-		}
-
-		reposted, err := getRepostedStatus(ctx, r.db, post.ID, userID)
-		if err != nil {
 			return nil, err
 		}
 
@@ -282,7 +238,11 @@ func (r *MySQLPostRepository) FindFeed(ctx context.Context, userID string, limit
 		NULL AS repost_created_at,
 		NULL AS repost_updated_at,
 		posts.created_at AS feed_time,  -- Use original post time for sorting
-		users.id, users.username, users.email -- post owner
+		users.id, users.username, users.email, -- post owner
+		-- Check if the current user has liked, favorited, or reposted the original post
+		EXISTS (SELECT 1 FROM likes l WHERE l.post_id = posts.id AND l.user_id = ?) AS liked,
+		EXISTS (SELECT 1 FROM favorites f WHERE f.post_id = posts.id AND f.user_id = ?) AS favorited,
+		EXISTS (SELECT 1 FROM reposts r WHERE r.post_id = posts.id AND r.user_id = ?) AS reposted
 	FROM posts
 	INNER JOIN users ON posts.user_id = users.id
 	LEFT JOIN follows ON posts.user_id = follows.followee_id
@@ -310,7 +270,11 @@ func (r *MySQLPostRepository) FindFeed(ctx context.Context, userID string, limit
 		reposts.created_at AS repost_created_at,
 		reposts.updated_at AS repost_updated_at,
 		reposts.created_at AS feed_time,  -- Use repost time for sorting
-		users.id, users.username, users.email -- post owner
+		users.id, users.username, users.email, -- post owner
+		-- Check if the current user has liked, favorited, or reposted the original post
+		EXISTS (SELECT 1 FROM likes l WHERE l.post_id = posts.id AND l.user_id = ?) AS liked,
+		EXISTS (SELECT 1 FROM favorites f WHERE f.post_id = posts.id AND f.user_id = ?) AS favorited,
+		EXISTS (SELECT 1 FROM reposts r WHERE r.post_id = posts.id AND r.user_id = ?) AS reposted
 	FROM reposts
 	INNER JOIN posts ON reposts.post_id = posts.id
 	INNER JOIN users ON users.id = posts.user_id
@@ -324,7 +288,7 @@ func (r *MySQLPostRepository) FindFeed(ctx context.Context, userID string, limit
 	LIMIT ? OFFSET ?;
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, userID, userID, userID, userID, limit, offset)
+	rows, err := r.db.QueryContext(ctx, query, userID, userID, userID, userID, userID, userID, userID, userID, userID, userID, limit, offset)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -364,22 +328,10 @@ func (r *MySQLPostRepository) FindFeed(ctx context.Context, userID string, limit
 			&postUser.ID,
 			&postUser.Username,
 			&postUser.Email,
+			&liked,
+			&favorited,
+			&reposted,
 		)
-		if err != nil {
-			return nil, 0, err
-		}
-
-		liked, err = getLikedStatus(ctx, r.db, post.ID, userID)
-		if err != nil {
-			return nil, 0, err
-		}
-
-		favorited, err = getFavoritedStatus(ctx, r.db, post.ID, userID)
-		if err != nil {
-			return nil, 0, err
-		}
-
-		reposted, err = getRepostedStatus(ctx, r.db, post.ID, userID)
 		if err != nil {
 			return nil, 0, err
 		}

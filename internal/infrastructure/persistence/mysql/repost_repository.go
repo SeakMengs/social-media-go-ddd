@@ -93,7 +93,11 @@ func (r *MySQLRepostRepository) FindByUserID(ctx context.Context, userID string)
 			COALESCE(favorites_count.count, 0) AS favorite_count,
 			COALESCE(reposts_count.count, 0) AS repost_count,
 			reposts.id, reposts.user_id, reposts.post_id, reposts.comment, reposts.created_at, reposts.updated_at,
-			users.id, users.username, users.email
+			users.id, users.username, users.email,
+			-- Check if the current user has liked, favorited, or reposted the post
+			EXISTS (SELECT 1 FROM likes l WHERE l.post_id = p.id AND l.user_id = ?) AS liked,
+			EXISTS (SELECT 1 FROM favorites f WHERE f.post_id = p.id AND f.user_id = ?) AS favorited,
+			EXISTS (SELECT 1 FROM reposts r WHERE r.post_id = p.id AND r.user_id = ?) AS reposted
 		FROM reposts
 		INNER JOIN users ON reposts.user_id = users.id
 		INNER JOIN posts p ON reposts.post_id = p.id
@@ -104,7 +108,7 @@ func (r *MySQLRepostRepository) FindByUserID(ctx context.Context, userID string)
 		ORDER BY reposts.created_at DESC
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, userID)
+	rows, err := r.db.QueryContext(ctx, query, userID, userID, userID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +140,9 @@ func (r *MySQLRepostRepository) FindByUserID(ctx context.Context, userID string)
 			&user.ID,
 			&user.Username,
 			&user.Email,
+			&liked,
+			&favorited,
+			&reposted,
 		); err != nil {
 			return nil, err
 		}
@@ -151,21 +158,6 @@ func (r *MySQLRepostRepository) FindByUserID(ctx context.Context, userID string)
 		}
 
 		eUser, err := user.ToEntity()
-		if err != nil {
-			return nil, err
-		}
-
-		liked, err = getLikedStatus(ctx, r.db, post.ID, userID)
-		if err != nil {
-			return nil, err
-		}
-
-		favorited, err = getFavoritedStatus(ctx, r.db, post.ID, userID)
-		if err != nil {
-			return nil, err
-		}
-
-		reposted, err = getRepostedStatus(ctx, r.db, post.ID, userID)
 		if err != nil {
 			return nil, err
 		}
