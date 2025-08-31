@@ -65,3 +65,16 @@ func (u *User) UnmarshalJSON(data []byte) error {
 	u.Password = valueobject.PasswordFromHash(usr.Password)
 	return nil
 }
+
+func (u *User) ToResponse() dto.UserAggregateResponse {
+	return dto.UserAggregateResponse{
+		ID:             u.ID,
+		Username:       u.Username,
+		Email:          u.Email,
+		CreatedAt:      u.CreatedAt,
+		UpdatedAt:      u.UpdatedAt,
+		Followed:       u.Followed,
+		FollowerCount:  u.FollowerCount,
+		FollowingCount: u.FollowingCount,
+	}
+}

@@ -111,7 +111,7 @@ func (h *UserHandler) CreateUser(ctx *fiber.Ctx) error {
 	}
 
 	return SuccessResponse(ctx, fiber.Map{
-		"user": user,
+		"user": user.ToResponse(),
 	})
 }
 
@@ -125,7 +125,7 @@ func (h *UserHandler) GetUserByID(ctx *fiber.Ctx) error {
 	}
 
 	return SuccessResponse(ctx, fiber.Map{
-		"user": user,
+		"user": user.ToResponse(),
 	})
 }
 
@@ -141,8 +141,13 @@ func (h *UserHandler) GetUsersByName(ctx *fiber.Ctx) error {
 		return ErrorResponse(ctx, fiber.StatusInternalServerError, err)
 	}
 
+	usersResp := make([]dto.UserAggregateResponse, len(users))
+	for i, u := range users {
+		usersResp[i] = u.ToResponse()
+	}
+
 	return SuccessResponse(ctx, fiber.Map{
-		"users": users,
+		"users": usersResp,
 	})
 }
 
@@ -176,13 +181,13 @@ func (h *UserHandler) Me(ctx *fiber.Ctx) error {
 
 		return SuccessResponse(ctx, fiber.Map{
 			"session": newSession,
-			"user":    user,
+			"user":    user.ToResponse(),
 		})
 	}
 
 	return SuccessResponse(ctx, fiber.Map{
 		"session": session,
-		"user":    user,
+		"user":    user.ToResponse(),
 	})
 }
 
@@ -218,7 +223,7 @@ func (h *UserHandler) Login(ctx *fiber.Ctx) error {
 
 	return SuccessResponse(ctx, fiber.Map{
 		"session": session,
-		"user":    user,
+		"user":    user.ToResponse(),
 	})
 }
 

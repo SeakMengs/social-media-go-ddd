@@ -60,6 +60,16 @@ func NewUser(nu dto.NewUser) (*User, error) {
 	return user, nil
 }
 
+func (u *User) ToResponse() dto.UserResponse {
+	return dto.UserResponse{
+		ID:        u.ID,
+		Username:  u.Username,
+		Email:     u.Email,
+		CreatedAt: u.CreatedAt,
+		UpdatedAt: u.UpdatedAt,
+	}
+}
+
 func (u *User) Validate() error {
 	if err := u.BaseEntity.Validate(); err != nil {
 		return err
